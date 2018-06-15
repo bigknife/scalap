@@ -1,0 +1,16 @@
+*
+!/**/
+!*.scala
+!*.java
+!*.sbt
+!*.txt
+!*.md
+!*.xml
+!*.properties
+!*.sh
+!.travis.yml
+!.gitignore
+/project/target/
+/target/
+/.ensime_cache/
+/.idea
