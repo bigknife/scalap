@@ -29,11 +29,11 @@ object Message {
 
   // Nominate Message
   // see the paper, Nominate v, i, X, Y, D
-  case class Nominate(
+  case class Nominate[A: Ordered[A]](
       nodeId: Node.ID, // v
       slotIndex: Long, // i
-      votes: Vector[Value], // X
-      accepted: Vector[Value], // Y
+      votes: Vector[Value[A]], // X
+      accepted: Vector[Value[A]], // Y
       quorumSetHash: Hash // D
   ) extends NominationStatement
 }

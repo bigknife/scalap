@@ -1,3 +1,3 @@
 package bigknife.scalap.ast.types
 
-case class Value(bytes: Array[Byte])
+case class Value[A: Ordered[A]](value: A)

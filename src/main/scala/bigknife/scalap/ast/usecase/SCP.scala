@@ -30,7 +30,7 @@ trait SCP[F[_]] extends BaseProtocol[F] with NominationProtocol[F] with BallotPr
         else
           for {
             s0 <- slotService.createSlot(nodeId, message.statement.slotIndex)
-            _  <- slotStore.saveSlotForNode(nodeId, message.statement.slotIndex, s0)
+            _  <- slotStore.saveSlotForNode(nodeId, s0)
           } yield s0
       } yield slot
 
@@ -40,6 +40,8 @@ trait SCP[F[_]] extends BaseProtocol[F] with NominationProtocol[F] with BallotPr
         case x: BallotStatement     => runBallotProtocol(slot, x)
       }
     }
+
+    // put together
     for {
       passed <- verifyMessage(message)
 
@@ -48,6 +50,7 @@ trait SCP[F[_]] extends BaseProtocol[F] with NominationProtocol[F] with BallotPr
         for {
           slot   <- getOrCreateSlot(nodeId, message.statement.slotIndex)
           result <- delegateToProtocol(slot, message)
+          _      <- slotStore.saveSlotForNode(nodeId, result._1)
         } yield result._2
 
     } yield state

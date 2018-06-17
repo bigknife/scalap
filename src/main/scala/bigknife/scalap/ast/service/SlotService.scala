@@ -12,5 +12,5 @@ import bigknife.sop.implicits._
     * @param slotIndex slot index
     * @return a new slot
     */
-  def createSlot(nodeId: Node.ID, slotIndex: Long): P[F, Slot]
+  def createSlot[A: Ordered](nodeId: Node.ID, slotIndex: Long): P[F, Slot[A]]
 }
