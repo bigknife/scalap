@@ -5,7 +5,7 @@ import bigknife.sop._
 import bigknife.sop.macros._
 import bigknife.sop.implicits._
 
-trait SlotService[F] {
+@sp trait SlotService[F[_]] {
   /**
     * create a slot with index for a node
     * @param nodeId node id

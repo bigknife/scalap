@@ -1,6 +1,6 @@
 package bigknife.scalap.ast.types
 
-case class Message[S <: Message.Statement](
+case class Message[+S <: Message.Statement](
     statement: S,
     signature: Signature
 )
