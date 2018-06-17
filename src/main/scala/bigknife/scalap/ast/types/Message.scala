@@ -32,8 +32,8 @@ object Message {
   case class Nominate(
       nodeId: Node.ID, // v
       slotIndex: Long, // i
-      votes: Set[Value], // X
-      accepted: Set[Value], // Y
+      votes: Vector[Value], // X
+      accepted: Vector[Value], // Y
       quorumSetHash: Hash // D
   ) extends NominationStatement
 }

@@ -10,7 +10,7 @@ class NominationProtocolSpec extends FunSuite {
     info(s"scp is $scp")
     val nodeId = Hash(Array.emptyByteArray)
     val msg = Message(
-      Message.Nominate(nodeId, 0, Set.empty, Set.empty, Hash(Array.emptyByteArray)),
+      Message.Nominate(nodeId, 0, Vector.empty, Vector.empty, Hash(Array.emptyByteArray)),
       Signature(Array.emptyByteArray)
     )
     val p = scp.handleMessage(nodeId, msg)
