@@ -1,3 +1,6 @@
 package bigknife.scalap.ast.types
 
-case class Value[A: Ordered[A]](value: A)
+trait Value extends Ordered[Value] {
+  def orderFactor: Int
+  override def compare(that: Value): Int = this.orderFactor - that.orderFactor
+}

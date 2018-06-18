@@ -12,7 +12,7 @@ import bigknife.sop.implicits._
     * @param slotIndex slot index
     * @return a slot or none.
     */
-  def getSlotOfNode[A: Ordered](nodeId: Node.ID, slotIndex: Long): P[F, Option[Slot[A]]]
+  def getSlotOfNode(nodeId: Node.ID, slotIndex: Long): P[F, Option[Slot]]
 
   /**
     * save slot for a node
@@ -20,5 +20,5 @@ import bigknife.sop.implicits._
     * @param slot slot
     * @return
     */
-  def saveSlotForNode[A: Ordered](nodeId: Node.ID, slot: Slot[A]): P[F, Unit]
+  def saveSlotForNode(nodeId: Node.ID, slot: Slot): P[F, Unit]
 }

@@ -36,8 +36,10 @@ trait SCP[F[_]] extends BaseProtocol[F] with NominationProtocol[F] with BallotPr
 
     def delegateToProtocol(slot: Slot, message: StatementMessage): SP[F, Result] = {
       message.statement match {
-        case x: NominationStatement => runNominationProtocol(slot, x)
-        case x: BallotStatement     => runBallotProtocol(slot, x)
+        case _: Message.NominationStatement =>
+          runNominationProtocol(slot, message.asInstanceOf[NominationMessage])
+        case _: Message.BallotStatement =>
+          runBallotProtocol(slot, message.asInstanceOf[BallotMessage])
       }
     }
 
@@ -69,7 +71,7 @@ object SCP {
     override def verifyMessage(message: StatementMessage): SP[F, Boolean] = ???
 
     override def runBallotProtocol(slot: Slot,
-                                   statement: BallotStatement): SP[F, (Slot, MessageState)] = ???
+                                   message: BallotMessage): SP[F, (Slot, MessageState)] = ???
 
     override val model: component.Model[F] = M
   }

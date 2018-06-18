@@ -12,4 +12,12 @@ import bigknife.sop.implicits._
     * @return
     */
   def isSaneNominationStatement(statement: NominationStatement): P[F, Boolean]
+
+  /**
+    * compute two nomination statement, return a newer one.
+    * @param st1 statement 1
+    * @param st2 statement 2
+    * @return
+    */
+  def newerNominationStatement(st1: NominationStatement, st2: NominationStatement): P[F, NominationStatement]
 }
