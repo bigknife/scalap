@@ -1,10 +1,18 @@
 package bigknife.scalap.interpreter
 package service
 
+import java.math.BigInteger
+
 import bigknife.scalap.ast.service.SlotService
-import bigknife.scalap.ast.types.{Message, NominationMessage, Slot, Value}
+import bigknife.scalap.ast.types.Node.ID
+import bigknife.scalap.ast.types._
+import org.bouncycastle.jcajce.provider.digest.SHA3
 
 class SlotServiceHandler extends SlotService.Handler[Stack] {
+  import scala.collection._
+
+  private val latestNominationStore: mutable.Map[(Node.ID, Long), NominationStatement] = mutable.Map.empty
+
   override def trackNewNominationMessage(slot: Slot,
                                          nominationMessage: NominationMessage): Stack[Slot] =
     Stack {
@@ -55,6 +63,30 @@ class SlotServiceHandler extends SlotService.Handler[Stack] {
       )
     )
   }
+
+  override def createSlot(nodeId: ID, slotIndex: Long): Stack[Slot] = Stack {
+    Slot(
+      nodeId,
+      0,
+      NominateTracker.Empty,
+      BallotTracker.Empty,
+      Vector.empty,
+      fullValidated = true
+    )
+  }
+
+  override def latestNominationStatement(
+      slot: Slot,
+      default: Message.NominationStatement): Stack[Message.NominationStatement] =
+    Stack {
+      latestNominationStore.getOrElse((slot.nodeId, slot.index), default)
+    }
+
+  override def computeValueHash(slot: Slot, value: Value): Stack[Long] =
+    Stack {
+      val hash = new SHA3.Digest256().digest(value.asBytes ++ s"${slot.index}".getBytes())
+      new BigInteger(hash).longValue()
+    }
 }
 
 object SlotServiceHandler {

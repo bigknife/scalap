@@ -14,3 +14,18 @@ case class NominateTracker(
     latestCompositedCandidate: Option[Value], // the latest candidate value
     previousValue: Option[Value] // the value from the previous slot
 )
+
+object NominateTracker {
+  val Empty: NominateTracker = NominateTracker(
+    Vector.empty,
+    Vector.empty,
+    Vector.empty,
+    Map.empty,
+    0,
+    None,
+    Vector.empty,
+    nominationStarted = false,
+    None,
+    None
+  )
+}
