@@ -10,6 +10,8 @@ package object types {
   type NominationStatement = Message.NominationStatement
   type BallotStatement     = Message.BallotStatement
 
+  type StatementPredict = Message.Statement.Predict
+
   object MessageState {
     def valid: MessageState   = Message.State.valid
     def invalid: MessageState = Message.State.invalid

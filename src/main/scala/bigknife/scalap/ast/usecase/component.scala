@@ -1,7 +1,7 @@
 package bigknife.scalap.ast.usecase
 
-import bigknife.scalap.ast.service.{MessageService, SlotService}
-import bigknife.scalap.ast.store.SlotStore
+import bigknife.scalap.ast.service._
+import bigknife.scalap.ast.store._
 import bigknife.sop._
 import bigknife.sop.macros._
 import bigknife.sop.implicits._
@@ -14,5 +14,8 @@ object component {
     val slotStore: SlotStore[F]
     val slotService: SlotService[F]
     val messageService: MessageService[F]
+    val nodeStore: NodeStore[F]
+    val quorumSetService: QuorumSetService[F]
+    val quorumSetStore: QuorumSetStore[F]
   }
 }

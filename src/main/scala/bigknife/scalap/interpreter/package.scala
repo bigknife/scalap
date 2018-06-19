@@ -23,6 +23,7 @@ package object interpreter {
       extends MessageServiceHandler.Implicits
       with SlotServiceHandler.Implicits
       with SlotStoreHandler.Implicits
+      with NodeStoreHandler.Implicits
 
   object runner {
     import bigknife.sop._
@@ -31,12 +32,12 @@ package object interpreter {
     import bigknife.scalap.interpreter.handlers._
     import bigknife.scalap.ast.usecase.component.Model._
 
-
-
-    def runStack[A](p: SP[Model.Op, A]): Stack[A]                         = p.interpret[Stack]
-    def runIO[A](p: SP[Model.Op, A], setting: Setting): cats.effect.IO[A] = runStack(p)(setting)
-    def runIOAttempt[A](p: SP[Model.Op, A],
-                        setting: Setting): cats.effect.IO[Either[Throwable, A]] =
+    def runStack[A](p: SP[Model.Op, A]): Stack[A] = p.interpret[Stack]
+    def runIO[A](p: SP[Model.Op, A], setting: Setting): cats.effect.IO[A] =
+      runStack(p)(setting)
+    def runIOAttempt[A](
+        p: SP[Model.Op, A],
+        setting: Setting): cats.effect.IO[Either[Throwable, A]] =
       runStack(p)(setting).attempt
   }
 
