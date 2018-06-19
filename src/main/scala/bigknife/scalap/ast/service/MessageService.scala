@@ -1,6 +1,7 @@
 package bigknife.scalap.ast.service
 
 import bigknife.scalap.ast.types.Message.NominationStatement
+import bigknife.scalap.ast.types._
 import bigknife.sop._
 import bigknife.sop.macros._
 import bigknife.sop.implicits._
@@ -20,4 +21,8 @@ import bigknife.sop.implicits._
     * @return
     */
   def newerNominationStatement(st1: NominationStatement, st2: NominationStatement): P[F, NominationStatement]
+
+  def firstNominationStatementIsNewer(st1: NominationStatement, st2: NominationStatement): P[F, Boolean]
+
+  def createNominationMessage(slot: Slot): P[F, NominationMessage]
 }

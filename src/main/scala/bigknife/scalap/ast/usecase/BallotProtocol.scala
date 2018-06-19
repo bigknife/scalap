@@ -9,5 +9,5 @@ import bigknife.sop.implicits._
   * ballot protocol of scp protocol
   */
 trait BallotProtocol[F[_]] extends BaseProtocol[F] {
-  def runBallotProtocol(slot: Slot, message: BallotMessage): SP[F, Result]
+  def runBallotProtocol(slot: Slot, message: BallotMessage): SP[F, Result] = ???
 }

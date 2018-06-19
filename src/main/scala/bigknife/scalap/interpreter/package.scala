@@ -23,6 +23,8 @@ package object interpreter {
       extends MessageServiceHandler.Implicits
       with SlotServiceHandler.Implicits
       with SlotStoreHandler.Implicits
+      with QuorumSetServiceHandler.Implicits
+      with QuorumSetStoreHandler.Implicits
       with NodeStoreHandler.Implicits
 
   object runner {

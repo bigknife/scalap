@@ -19,7 +19,34 @@ trait BaseProtocol[F[_]] {
 
   import model._
 
-  def getQuorumSetFromStatement(statement: Message.Statement): SP[F, Option[QuorumSet]] = {
+  /**
+    * validate a nomination value's validity
+    * @param value value
+    * @return
+    */
+  def validateNominationValue(value: Value): SP[F, Value.Validity]
+
+  /**
+    * try to transforms a value to a fully validted value that the local node would agree to
+    * @param slot slot
+    * @param value value(not fully validated)
+    * @return
+    */
+  def extractValidValue(slot: Slot, value: Value): SP[F, Option[Value]]
+
+  /**
+    * emit message to other nodes
+    * @param message message
+    * @return
+    */
+  def emitMessage(message: StatementMessage): SP[F, Unit]
+
+  /**
+    * get quorum set from a statement
+    * @param statement statement
+    * @return
+    */
+  final def getQuorumSetFromStatement(statement: Message.Statement): SP[F, Option[QuorumSet]] = {
     statement match {
       case x: Message.Externalize =>
         for {
@@ -28,8 +55,8 @@ trait BaseProtocol[F[_]] {
 
       case x =>
         for {
-        qsOpt <- quorumSetStore.getQuorumSet(x.quorumSetHash)
-      } yield qsOpt
+          qsOpt <- quorumSetStore.getQuorumSet(x.quorumSetHash)
+        } yield qsOpt
 
     }
   }
@@ -42,11 +69,10 @@ trait BaseProtocol[F[_]] {
     * @param messages messages
     * @return
     */
-  def federateAccept(
-      slot: Slot,
-      voted: StatementPredict,
-      accepted: StatementPredict,
-      messages: Map[Node.ID, StatementMessage]): SP[F, Boolean] = {
+  final def federatedAccept(slot: Slot,
+                            voted: StatementPredict,
+                            accepted: StatementPredict,
+                            messages: Map[Node.ID, StatementMessage]): SP[F, Boolean] = {
     // 1. if a node v's vblocking has accepted, then accepted.
     //    say, if accepted nodes is the v-blocking set of the quorum set, then accepted
     val acceptedNodes = messages
@@ -56,11 +82,10 @@ trait BaseProtocol[F[_]] {
       .keys
       .toVector
 
-    val ratifiedMessages = messages
+    val ratifiedMessages: Map[Node.ID, StatementMessage] = messages
       .filter {
         case (_, statementMessage) =>
-          accepted(statementMessage.statement) || voted(
-            statementMessage.statement)
+          accepted(statementMessage.statement) || voted(statementMessage.statement)
       }
 
     // exclude the nodes whose quorumset not including these nodes as a quorum slice
@@ -68,25 +93,66 @@ trait BaseProtocol[F[_]] {
     def ratifiedNodes(ratifiedMessages: Map[Node.ID, StatementMessage]): SP[F, Vector[Node.ID]] = {
       // result, nodes to build quorum slice
       val nodes = ratifiedMessages.keys.toVector
-      val init = (Vector.empty[Node.ID], nodes).pureSP[F]
-      nodes.foldLeft(init) {(acc, n) =>
-        for {
-          prev <- acc
-          qsOpt <- getQuorumSetFromStatement(ratifiedMessages(n).statement)
-          isQs <- if (qsOpt.isDefined) quorumSetService.isQuorumSlice(qsOpt.get, prev._2) else false.pureSP[F]
-        } yield if (isQs) (prev._1 :+ n, nodes) else (prev._1, nodes.filter(_ != n))
-      }.map(_._1)
+      val init  = (Vector.empty[Node.ID], nodes).pureSP[F]
+      nodes
+        .foldLeft(init) { (acc, n) =>
+          val n1: SP[F, (Vector[Node.ID], Vector[Node.ID])] = for {
+            prev  <- acc
+            qsOpt <- getQuorumSetFromStatement(ratifiedMessages(n).statement)
+            isQs <- if (qsOpt.isDefined)
+              quorumSetService.isQuorumSlice(qsOpt.get, prev._2): SP[F, Boolean]
+            else false.pureSP[F]
+          } yield if (isQs) (prev._1 :+ n, nodes) else (prev._1, nodes.filter(_ != n))
+          n1
+        }
+        .map(_._1)
     }
 
-
     for {
-      qs <- quorumSetService.quorumFunction(slot.nodeId)
+      qs                  <- quorumSetService.quorumFunction(slot.nodeId)
       acceptedByVBlocking <- quorumSetService.isVBlocking(qs, acceptedNodes)
-      acceptedByQuorum <- if (acceptedByVBlocking) true.pureSP[F] else for {
-        nodes <- ratifiedNodes(messages)
-        accepted <- quorumSetService.isQuorumSlice(qs, nodes)
-      } yield accepted
+      acceptedByQuorum <- if (acceptedByVBlocking) true.pureSP[F]
+      else
+        for {
+          nodes    <- ratifiedNodes(ratifiedMessages)
+          accepted <- quorumSetService.isQuorumSlice(qs, nodes)
+        } yield accepted
     } yield acceptedByQuorum
 
+  }
+
+  final def federatedRatify(slot: Slot,
+                            voted: StatementPredict,
+                            messages: Map[Node.ID, StatementMessage]): SP[F, Boolean] = {
+    val ratifiedMessages = messages
+      .filter {
+        case (_, statementMessage) =>
+          voted(statementMessage.statement)
+      }
+
+    // exclude the nodes whose quorumset not including these nodes as a quorum slice
+    // proved node has accepted and nodes' quorum set also accepted
+    def ratifiedNodes(ratifiedMessages: Map[Node.ID, StatementMessage]): SP[F, Vector[Node.ID]] = {
+      // result, nodes to build quorum slice
+      val nodes = ratifiedMessages.keys.toVector
+      val init  = (Vector.empty[Node.ID], nodes).pureSP[F]
+      nodes
+        .foldLeft(init) { (acc, n) =>
+          for {
+            prev  <- acc
+            qsOpt <- getQuorumSetFromStatement(ratifiedMessages(n).statement)
+            isQs <- if (qsOpt.isDefined)
+              quorumSetService.isQuorumSlice(qsOpt.get, prev._2): SP[F, Boolean]
+            else false.pureSP[F]
+          } yield if (isQs) (prev._1 :+ n, nodes) else (prev._1, nodes.filter(_ != n))
+        }
+        .map(_._1)
+    }
+
+    for {
+      qs    <- quorumSetService.quorumFunction(slot.nodeId)
+      nodes <- ratifiedNodes(ratifiedMessages)
+      isQs  <- quorumSetService.isQuorumSlice(qs, nodes)
+    } yield isQs
   }
 }
