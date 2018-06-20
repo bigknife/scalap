@@ -10,6 +10,8 @@ import cats.implicits._
   * nomination protocol of scp
   */
 trait NominationProtocol[F[_]] extends BaseProtocol[F] {
+  ballotProtocol: BallotProtocol[F] =>
+
   import model._
 
   /**
@@ -134,13 +136,13 @@ trait NominationProtocol[F[_]] extends BaseProtocol[F] {
 
     def emitNomination(slot: Slot): SP[F, Slot] = {
       for {
-        _ <- logService.info(s"try to emit nomination for $slot")
+        _      <- logService.info(s"try to emit nomination for $slot")
         qs     <- quorumSetService.quorumFunction(slot.nodeId)
         hash   <- quorumSetService.hashOfQuorumSet(qs)
         msg    <- messageService.createNominationMessage(slot, hash)
-        _ <- logService.info(s"create new nomination message: $msg")
+        _      <- logService.info(s"create new nomination message: $msg")
         result <- runNominationProtocol(slot, msg)
-        _ <- logService.info(s"run nomination locally return $result")
+        _      <- logService.info(s"run nomination locally return $result")
         xSlot <- if (result._2 != Message.State.valid) result._1.pureSP[F]
         else {
           for {
@@ -162,14 +164,24 @@ trait NominationProtocol[F[_]] extends BaseProtocol[F] {
       } yield xSlot
     }
 
+    def gotNewCandidate(slot: Slot): SP[F, Slot] = {
+      for {
+        composite <- applicationExtension.combineValues(slot.nominateTracker.candidates)
+        xSlot     <- slotService.updateCompositeCandidateValue(slot, composite)
+        _         <- ballotProtocol.bumpState(xSlot, composite)
+      } yield xSlot
+    }
+
     val process: SP[F, Result] = for {
-      slot0      <- slotService.trackNewNominationMessage(slot, message)
-      promotion1 <- federatedAcceptNominations(slot0)
-      promotion2 <- federatedRatifyNominations(promotion1)
-      promotion3 <- takeRoundLeaderVotes(promotion2)
-      modified   <- slotService.hasBeenModifiedInNomination(slot0, promotion3)
-      promotion4 <- if (modified) emitNomination(promotion3) else promotion3.pureSP[F]
-      r          <- validResult(promotion4)
+      slot0        <- slotService.trackNewNominationMessage(slot, message)
+      promotion1   <- federatedAcceptNominations(slot0)
+      promotion2   <- federatedRatifyNominations(promotion1)
+      promotion3   <- takeRoundLeaderVotes(promotion2)
+      modified     <- slotService.hasBeenModifiedInNomination(slot0, promotion3)
+      promotion4   <- if (modified) emitNomination(promotion3) else promotion3.pureSP[F]
+      newCandidate <- slotService.hasNewCandidates(slot0, promotion4)
+      promotion5   <- if (newCandidate) gotNewCandidate(promotion4) else promotion4.pureSP[F]
+      r            <- validResult(promotion5)
     } yield r
 
     // process after verified

@@ -63,4 +63,9 @@ trait SCP[F[_]] extends BaseProtocol[F] with NominationProtocol[F] with BallotPr
 
   final def getSlot(nodeId: Node.ID, slotIndex: Long): SP[F, Option[Slot]] =
     slotStore.getSlotOfNode(nodeId, slotIndex)
+
+  final def saveQuorumSet(quorumSet: QuorumSet): SP[F, Unit] = for {
+    hash <- quorumSetService.hashOfQuorumSet(quorumSet)
+    _ <- quorumSetStore.saveQuorumSet(hash, quorumSet)
+  } yield ()
 }

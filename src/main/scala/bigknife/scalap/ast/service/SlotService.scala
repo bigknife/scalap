@@ -64,13 +64,35 @@ import bigknife.sop.implicits._
     */
   def computeValueHash(slot: Slot, value: Value): P[F, Long]
 
+  /**
+    * emit nomination message for slot
+    * @param slot slot
+    * @param message nomination message
+    * @return
+    */
   def emitNominateMessage(slot: Slot, message: NominationMessage): P[F, Slot]
 
   /**
-    * compute two slot,determine they are same or not
+    * compute two slot,determine they are same or not, only concern voted and accepted, candidates ignored
     * @param s1 slot 1
     * @param s2 slot 2
     * @return
     */
   def hasBeenModifiedInNomination(s1: Slot, s2: Slot): P[F, Boolean]
+
+  /**
+    * from the second parameter's point of view if has new candidate  relative to the first parameter
+    * @param s1 first slot
+    * @param s2 second slot
+    * @return
+    */
+  def hasNewCandidates(s1: Slot, s2: Slot): P[F, Boolean]
+
+  /**
+    * update the slot's nomination tracker's latest composite value
+    * @param slot slot
+    * @param compositeValue combined value
+    * @return
+    */
+  def updateCompositeCandidateValue(slot: Slot, compositeValue: Value): P[F, Slot]
 }

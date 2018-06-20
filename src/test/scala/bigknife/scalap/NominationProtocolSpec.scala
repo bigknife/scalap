@@ -17,12 +17,13 @@ class NominationProtocolSpec extends FunSuite {
 
   def hashOfQuorumSet(qs: QuorumSet): Hash = {
     def _inner(qs: QuorumSet): Vector[Byte] = {
-      val h1 = s"${qs.threshold}".toVector.map(_.toByte) ++ qs.validators.flatMap(_.value.toVector)
+      val bb = java.nio.ByteBuffer.allocate(4)
+      bb.putInt(qs.threshold)
+      val h1 = bb.array().toVector ++ qs.validators.flatMap(_.value.toVector)
       val h2 = qs.innerSets.flatMap(x => _inner(x))
       h1 ++ h2
     }
-
-    Hash(sha3(_inner(qs).toArray))
+    Hash(misc.crypto.sha3(_inner(qs).toArray))
   }
 
   test("test program") {
@@ -63,7 +64,7 @@ class NominationProtocolSpec extends FunSuite {
     val nomV2 =
       Message.Nominate(node2, slotIndex, Vector(value), Vector(value), hashOfQuorumSet(qs2))
     val nomV3 =
-      Message.Nominate(node3, slotIndex, Vector(value), Vector(value), hashOfQuorumSet(qs2))
+      Message.Nominate(node3, slotIndex, Vector(value), Vector(value), hashOfQuorumSet(qs3))
 
     val msg1 = Message(nomV2, Signature.Empty)
     val msg2 = Message(nomV3, Signature.Empty)
@@ -75,6 +76,10 @@ class NominationProtocolSpec extends FunSuite {
     val p3 = scpTest.getSlot(setting1.nodeId, slotIndex)
 
     val p = for {
+      _ <- scpTest.saveQuorumSet(qs1)
+      _ <- scpTest.saveQuorumSet(qs2)
+      _ <- scpTest.saveQuorumSet(qs3)
+      _ <- scpTest.saveQuorumSet(qs4)
       _ <- p1
       _ <- p2
       x <- p3

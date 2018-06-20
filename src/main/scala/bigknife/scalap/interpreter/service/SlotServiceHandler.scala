@@ -95,6 +95,21 @@ class SlotServiceHandler extends SlotService.Handler[Stack] {
       val hash = new SHA3.Digest256().digest(value.asBytes ++ s"${slot.index}".getBytes())
       new BigInteger(hash).longValue()
     }
+
+  override def hasNewCandidates(s1: Slot, s2: Slot): Stack[Boolean] = Stack {
+    s2.index == s1.index &&
+    s2.nominateTracker.candidates.length > s1.nominateTracker.candidates.length &&
+    s2.nominateTracker.candidates.startsWith(s1.nominateTracker.candidates)
+  }
+
+  override def updateCompositeCandidateValue(slot: Slot, compositeValue: Value): Stack[Slot] =
+    Stack {
+      slot.copy(
+        nominateTracker = slot.nominateTracker.copy(
+          latestCompositedCandidate = Some(compositeValue)
+        )
+      )
+    }
 }
 
 object SlotServiceHandler {

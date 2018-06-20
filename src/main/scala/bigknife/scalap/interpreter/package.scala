@@ -19,6 +19,7 @@ package object interpreter {
     }
   }
 
+  /*
   object handlers
       extends MessageServiceHandler.Implicits
       with SlotServiceHandler.Implicits
@@ -43,5 +44,5 @@ package object interpreter {
         setting: Setting): cats.effect.IO[Either[Throwable, A]] =
       runStack(p)(setting).attempt
   }
-
+  */
 }

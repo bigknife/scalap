@@ -18,5 +18,8 @@ object component {
     val quorumSetService: QuorumSetService[F]
     val quorumSetStore: QuorumSetStore[F]
     val logService: LogService[F]
+
+    // this is the application level extension
+    val applicationExtension: ApplicationExtension[F]
   }
 }
