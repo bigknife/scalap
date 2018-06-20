@@ -11,13 +11,28 @@ class QuorumSetServiceHandler extends QuorumSetService.Handler[Stack] {
 
 
   override def isQuorumSetSane(quorumSet: QuorumSet): Stack[Boolean] = Stack {
-    def checkSanity(quorumSet: QuorumSet, depth: Int): Boolean = {
+    def checkSanity(quorumSet: QuorumSet, depth: Int, extraChecks: Boolean, knownNodes: Vector[Node.ID]): Boolean = {
+      val totalSize = quorumSet.validators.length + quorumSet.innerSets.length
+      val vBlockingSize = totalSize - quorumSet.threshold + 1
+
       if (depth > 2 ||
         quorumSet.threshold < 1 ||
-        quorumSet.threshold > quorumSet.validators.length + quorumSet.innerSets.length
+        quorumSet.threshold > totalSize ||
+        (extraChecks && quorumSet.threshold < vBlockingSize)
       ) false // quorum set is limited to 2 layers, threshold should >= 1
       else {
-        
+        // known nodes and presence
+        val check = quorumSet.validators.foldLeft((knownNodes, false)) {
+          case (x@(nodes, presence), nodeId) => if (presence) {
+            if (nodes.contains(nodeId)) (nodes, true) else (nodes :+ nodeId, true)
+          } else {
+            if (nodes.contains(nodeId)) (nodes, true) else (nodes :+ nodeId, false)
+          }
+        }
+        if (check._2) {
+          // todo: check recursively inner
+          ???
+        } else false
       }
     }
 
