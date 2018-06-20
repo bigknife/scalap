@@ -28,10 +28,17 @@ import bigknife.sop.implicits._
   def isVBlocking(quorumSet: QuorumSet, nodes: Vector[Node.ID]): P[F, Boolean]
 
   /**
-    * for a quorumset, is the given nodes a quorum slice?
-    * @param quorumSet
-    * @param nodes
+    * for a quorum set, is the given nodes a quorum slice?
+    * @param quorumSet quorum set
+    * @param nodes nodes
     * @return
     */
   def isQuorumSlice(quorumSet: QuorumSet, nodes: Vector[Node.ID]): P[F, Boolean]
+
+  /**
+    * compute a quorum set's hash
+    * @param quorumSet quorum set
+    * @return
+    */
+  def hashOfQuorumSet(quorumSet: QuorumSet): P[F, Hash]
 }

@@ -4,6 +4,7 @@ import bigknife.scalap.ast.types.Value.Validity
 import bigknife.scalap.ast.types._
 import bigknife.sop._
 import bigknife.sop.implicits._
+import cats.implicits._
 
 /**
   * nomination protocol of scp
@@ -18,9 +19,13 @@ trait NominationProtocol[F[_]] extends BaseProtocol[F] {
     * @return
     */
   def runNominationProtocol(slot: Slot, message: NominationMessage): SP[F, Result] = {
-    import cats.implicits._
-    val verify: SP[F, Boolean] =
-      (isSane(message.statement), isNewer(slot, message.statement)).mapN(_ && _)
+
+    val verify: SP[F, Boolean] = for {
+      x <- isSane(message.statement)
+      _ <- logService.info(s"is sane? $x for $message")
+      y <- isNewer(slot, message.statement)
+      _ <- logService.info(s"isNewer? $x for $message")
+    } yield x && y
 
     def votedPredict(value: Value) = Message.Statement.predict {
       case x: Message.Nominate => x.votes.contains(value)
@@ -129,8 +134,13 @@ trait NominationProtocol[F[_]] extends BaseProtocol[F] {
 
     def emitNomination(slot: Slot): SP[F, Slot] = {
       for {
-        msg    <- messageService.createNominationMessage(slot)
+        _ <- logService.info(s"try to emit nomination for $slot")
+        qs     <- quorumSetService.quorumFunction(slot.nodeId)
+        hash   <- quorumSetService.hashOfQuorumSet(qs)
+        msg    <- messageService.createNominationMessage(slot, hash)
+        _ <- logService.info(s"create new nomination message: $msg")
         result <- runNominationProtocol(slot, msg)
+        _ <- logService.info(s"run nomination locally return $result")
         xSlot <- if (result._2 != Message.State.valid) result._1.pureSP[F]
         else {
           for {
@@ -139,6 +149,9 @@ trait NominationProtocol[F[_]] extends BaseProtocol[F] {
               messageService.firstNominationStatementIsNewer(
                 msg.statement,
                 slot.nominateTracker.lastEmittedMessage.get.statement): SP[F, Boolean]
+
+            _ <- logService.debug(s"message try to be emitted isNew ? $isNew")
+
             s0 <- if (isNew) for {
               s1 <- slotService.emitNominateMessage(result._1, msg): SP[F, Slot]
               _  <- if (slot.fullValidated) emitMessage(msg): SP[F, Unit] else ().pureSP[F]
@@ -171,7 +184,8 @@ trait NominationProtocol[F[_]] extends BaseProtocol[F] {
     * @param statement statement
     * @return
     */
-  private def isSane(statement: NominationStatement): P[F, Boolean] = ???
+  private def isSane(statement: NominationStatement): SP[F, Boolean] =
+    messageService.isSaneNominationStatement(statement)
 
   /**
     * is the coming message newer than the latest nomination message sent from the node saved in slot.
@@ -179,5 +193,11 @@ trait NominationProtocol[F[_]] extends BaseProtocol[F] {
     * @param statement coming message
     * @return
     */
-  private def isNewer(slot: Slot, statement: NominationStatement): P[F, Boolean] = ???
+  private def isNewer(slot: Slot, statement: NominationStatement): SP[F, Boolean] = {
+    val savedNominationOpt = slot.nominateTracker.latestNominations.get(slot.nodeId)
+    if (savedNominationOpt.isEmpty) true.pureP[F]
+    else {
+      messageService.firstNominationStatementIsNewer(statement, savedNominationOpt.get.statement)
+    }
+  }
 }

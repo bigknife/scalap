@@ -1,3 +1,8 @@
 package bigknife.scalap.interpreter
 
-case class Setting()
+import bigknife.scalap.ast.types._
+
+case class Setting(
+    nodeId: Node.ID,
+    quorumSet: QuorumSet
+)

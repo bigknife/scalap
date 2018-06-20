@@ -2,9 +2,12 @@ package bigknife.scalap.interpreter
 package service
 
 import bigknife.scalap.ast.service.QuorumSetService
+import bigknife.scalap.ast.types.Node.ID
 import bigknife.scalap.ast.types._
+import org.slf4j.{Logger, LoggerFactory}
 
 class QuorumSetServiceHandler extends QuorumSetService.Handler[Stack] {
+  private val logger: Logger = LoggerFactory.getLogger(getClass)
   override def isVBlocking(quorumSet: QuorumSet,
                            nodes: Vector[Node.ID]): Stack[Boolean] = Stack {
 
@@ -51,6 +54,23 @@ class QuorumSetServiceHandler extends QuorumSetService.Handler[Stack] {
       }
     }
     isQuorumSliceInternal(quorumSet, nodes)
+  }
+
+  override def quorumFunction(nodeId: ID): Stack[QuorumSet] = Stack {setting =>
+    logger.debug(s"Q($nodeId)")
+    if (setting.nodeId == nodeId) setting.quorumSet
+    else QuorumSet.Empty
+  }
+
+  override def hashOfQuorumSet(quorumSet: QuorumSet): Stack[Hash] = Stack {
+    def _inner(qs: QuorumSet): Vector[Byte] = {
+      val bb = java.nio.ByteBuffer.allocate(4)
+      bb.putInt(qs.threshold)
+      val h1 = bb.array().toVector ++ qs.validators.flatMap(_.value.toVector)
+      val h2 = qs.innerSets.flatMap(x => _inner(x))
+      h1 ++ h2
+    }
+    Hash(misc.crypto.sha3(_inner(quorumSet).toArray))
   }
 }
 

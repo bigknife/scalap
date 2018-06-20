@@ -24,5 +24,5 @@ import bigknife.sop.implicits._
 
   def firstNominationStatementIsNewer(st1: NominationStatement, st2: NominationStatement): P[F, Boolean]
 
-  def createNominationMessage(slot: Slot): P[F, NominationMessage]
+  def createNominationMessage(slot: Slot, quorumSetHash: Hash): P[F, NominationMessage]
 }

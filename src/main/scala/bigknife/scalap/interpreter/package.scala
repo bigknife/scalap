@@ -25,6 +25,7 @@ package object interpreter {
       with SlotStoreHandler.Implicits
       with QuorumSetServiceHandler.Implicits
       with QuorumSetStoreHandler.Implicits
+      with LogServiceHandler.Implicits
       with NodeStoreHandler.Implicits
 
   object runner {

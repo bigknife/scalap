@@ -11,14 +11,15 @@ import org.bouncycastle.jcajce.provider.digest.SHA3
 class SlotServiceHandler extends SlotService.Handler[Stack] {
   import scala.collection._
 
-  private val latestNominationStore: mutable.Map[(Node.ID, Long), NominationStatement] = mutable.Map.empty
+  private val latestNominationStore: mutable.Map[(Node.ID, Long), NominationStatement] =
+    mutable.Map.empty
 
   override def trackNewNominationMessage(slot: Slot,
                                          nominationMessage: NominationMessage): Stack[Slot] =
     Stack {
       slot.copy(
         nominateTracker = slot.nominateTracker.copy(
-          latestNominations = slot.nominateTracker.latestNominations + (slot.nodeId -> nominationMessage)),
+          latestNominations = slot.nominateTracker.latestNominations + (nominationMessage.statement.nodeId -> nominationMessage)),
         statementHistory = slot.statementHistory :+ Message.HistoricalStatement(
           nominationMessage.statement,
           System.currentTimeMillis(),
@@ -27,10 +28,15 @@ class SlotServiceHandler extends SlotService.Handler[Stack] {
     }
 
   override def acceptNomination(slot: Slot, value: Value): Stack[Slot] = Stack {
+
     slot.copy(
       nominateTracker = slot.nominateTracker.copy(
-        voted = slot.nominateTracker.voted :+ value,
-        accepted = slot.nominateTracker.accepted :+ value
+        voted =
+          if (slot.nominateTracker.voted.contains(value)) slot.nominateTracker.voted
+          else slot.nominateTracker.voted :+ value,
+        accepted =
+          if (slot.nominateTracker.accepted.contains(value)) slot.nominateTracker.accepted
+          else slot.nominateTracker.accepted :+ value
       )
     )
   }
@@ -38,7 +44,9 @@ class SlotServiceHandler extends SlotService.Handler[Stack] {
   override def voteNomination(slot: Slot, value: Value): Stack[Slot] = Stack {
     slot.copy(
       nominateTracker = slot.nominateTracker.copy(
-        voted = slot.nominateTracker.voted :+ value
+        voted =
+          if (slot.nominateTracker.voted.contains(value)) slot.nominateTracker.voted
+          else slot.nominateTracker.voted :+ value
       )
     )
   }

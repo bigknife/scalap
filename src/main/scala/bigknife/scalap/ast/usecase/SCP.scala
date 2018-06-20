@@ -30,6 +30,7 @@ trait SCP[F[_]] extends BaseProtocol[F] with NominationProtocol[F] with BallotPr
         else
           for {
             s0 <- slotService.createSlot(nodeId, message.statement.slotIndex)
+            _ <- logService.info(s"create a new slot for Node.ID($nodeId)#SlotIndex(${message.statement.slotIndex})")
             _  <- slotStore.saveSlotForNode(nodeId, s0)
           } yield s0
       } yield slot
@@ -46,57 +47,20 @@ trait SCP[F[_]] extends BaseProtocol[F] with NominationProtocol[F] with BallotPr
     // put together
     for {
       passed <- verifyMessage(message)
-
+      _      <- logService.info(s"verify application message: $passed")
       state <- if (!passed) MessageState.invalid.pureSP[F]
       else
         for {
           slot   <- getOrCreateSlot(nodeId, message.statement.slotIndex)
+          _      <- logService.info(s"current slot: $slot")
           result <- delegateToProtocol(slot, message)
+          _      <- logService.info(s"after protocol: $result")
           _      <- slotStore.saveSlotForNode(nodeId, result._1)
         } yield result._2
 
     } yield state
   }
-}
 
-object SCP {
-  def apply[F[_]](implicit M: component.Model[F]): SCP[F] = new SCP[F] {
-    override val model: component.Model[F] = M
-
-    /**
-      * verify a message in application level.
-      *
-      * @param message message with statement and signature
-      * @return if passed true else false
-      */
-    override def verifyMessage(message: StatementMessage): SP[F, Boolean] = ???
-
-
-
-
-    /**
-      * validate a nomination value's validity
-      *
-      * @param value value
-      * @return
-      */
-    override def validateNominationValue(value: Value): SP[F, Value.Validity] = ???
-
-    /**
-      * try to transforms a value to a fully validted value that the local node would agree to
-      *
-      * @param slot  slot
-      * @param value value(not fully validated)
-      * @return
-      */
-    override def extractValidValue(slot: Slot, value: Value): SP[F, Option[Value]] = ???
-
-    /**
-      * emit message to other nodes
-      *
-      * @param message message
-      * @return
-      */
-    override def emitMessage(message: StatementMessage): SP[F, Unit] = ???
-  }
+  final def getSlot(nodeId: Node.ID, slotIndex: Long): SP[F, Option[Slot]] =
+    slotStore.getSlotOfNode(nodeId, slotIndex)
 }

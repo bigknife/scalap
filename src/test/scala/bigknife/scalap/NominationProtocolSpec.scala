@@ -4,6 +4,7 @@ import bigknife.scalap.ast.usecase._
 import bigknife.scalap.ast.types._
 import bigknife.scalap.ast.usecase.component._
 import bigknife.scalap.interpreter._
+import cats.kernel.instances.hash
 import org.scalatest.FunSuite
 
 class NominationProtocolSpec extends FunSuite {
@@ -25,42 +26,62 @@ class NominationProtocolSpec extends FunSuite {
   }
 
   test("test program") {
+    // prepare data
+    val nodeIds         = Vector("v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8").map(x => Node.ID(sha3(x)))
+    val slotIndex: Long = 1
+    val value = TestValue("hello,world")
 
-    info(s"scp is $scp")
-
-    val quorumSet = QuorumSet(
-      3, Vector("v1", "v2", "v3", "v4").map(x => Node.ID(sha3(x))),
-      Vector(
-        QuorumSet(3, Vector("v1", "v3", "v5", "v7").map(x => Node.ID(sha3(x))), Vector.empty),
-        QuorumSet(3, Vector("v1", "v2", "v4", "v6").map(x => Node.ID(sha3(x))), Vector.empty)
-      )
+    // current node is v1, qs is {{v1,v2,v3}}
+    val node1 = nodeIds(0)
+    val qs1 = QuorumSet.Empty
+      .withThreshold(2)
+      .withValidators(nodeIds.take(3))
+    val setting1: Setting = Setting(
+      nodeId = Node.ID(sha3("v1")),
+      qs1
     )
 
-    val hash = hashOfQuorumSet(quorumSet)
-    val hashHex = hash.value.map("%02x" format _).mkString("")
+    // node2 {{v2,v3,v4}}
+    val node2 = nodeIds(1)
+    val qs2 = QuorumSet.Empty
+      .withThreshold(2)
+      .withValidators(nodeIds.slice(1, 4))
 
-    info(s"hashHex = $hashHex")
+    // node3 {{v2,v3,v4}}
+    val node3 = nodeIds(2)
+    val qs3 = QuorumSet.Empty
+      .withThreshold(2)
+      .withValidators(nodeIds.slice(1, 4))
 
-    val value = new Value {
-      override def orderFactor: Int = 1
+    // node4 {{v2,v3,v4}}
+    val node4 = nodeIds(3)
+    val qs4 = QuorumSet.Empty
+      .withThreshold(2)
+      .withValidators(nodeIds.slice(1, 4))
 
-      override def asBytes: Array[Byte] = "hello,world".getBytes
+    // first a nomination message from v2
+    val nomV2 =
+      Message.Nominate(node2, slotIndex, Vector(value), Vector(value), hashOfQuorumSet(qs2))
+    val nomV3 =
+      Message.Nominate(node3, slotIndex, Vector(value), Vector(value), hashOfQuorumSet(qs2))
 
-      override def toString: String = s"this is value of test, order factor: $orderFactor"
-    }
-
-    val nomination = Message.Nominate(quorumSet.validators(0), 1, Vector(value), Vector(value), hash)
-
-    val msg = Message(
-      nomination,
-      Signature(Array.emptyByteArray)
-    )
+    val msg1 = Message(nomV2, Signature.Empty)
+    val msg2 = Message(nomV3, Signature.Empty)
 
     val scpTest = SCPTest[component.Model.Op]
 
-    val p = scpTest.handleMessage(nomination.nodeId, msg)
+    val p1 = scpTest.handleMessage(setting1.nodeId, msg1)
+    val p2 = scpTest.handleMessage(setting1.nodeId, msg2)
+    val p3 = scpTest.getSlot(setting1.nodeId, slotIndex)
 
-    runner.runIO(p, Setting()).unsafeRunSync()
+    val p = for {
+      _ <- p1
+      _ <- p2
+      x <- p3
+    } yield x.get
+
+    val slot = runner.runIO(p, setting1).unsafeRunSync()
+    info(s"slot: $slot")
 
   }
 }

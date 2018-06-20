@@ -17,5 +17,6 @@ object component {
     val nodeStore: NodeStore[F]
     val quorumSetService: QuorumSetService[F]
     val quorumSetStore: QuorumSetStore[F]
+    val logService: LogService[F]
   }
 }
