@@ -8,6 +8,22 @@ import org.slf4j.{Logger, LoggerFactory}
 
 class QuorumSetServiceHandler extends QuorumSetService.Handler[Stack] {
   private val logger: Logger = LoggerFactory.getLogger(getClass)
+
+
+  override def isQuorumSetSane(quorumSet: QuorumSet): Stack[Boolean] = Stack {
+    def checkSanity(quorumSet: QuorumSet, depth: Int): Boolean = {
+      if (depth > 2 ||
+        quorumSet.threshold < 1 ||
+        quorumSet.threshold > quorumSet.validators.length + quorumSet.innerSets.length
+      ) false // quorum set is limited to 2 layers, threshold should >= 1
+      else {
+        
+      }
+    }
+
+    checkSanity(quorumSet, 0)
+  }
+
   override def isVBlocking(quorumSet: QuorumSet,
                            nodes: Vector[Node.ID]): Stack[Boolean] = Stack {
 

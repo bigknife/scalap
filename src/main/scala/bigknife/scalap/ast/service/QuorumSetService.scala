@@ -6,12 +6,21 @@ import bigknife.sop.macros._
 import bigknife.sop.implicits._
 
 @sp trait QuorumSetService[F[_]] {
+
+  /**
+    * is the quorum set sane
+    * @param quorumSet quorum set
+    * @return
+    */
+  def isQuorumSetSane(quorumSet: QuorumSet): P[F, Boolean]
+
   /**
     * create a singleton quorum set for a node
     * @param nodeId node id
     * @return
     */
   def buildSingletonQuorumSet(nodeId: Node.ID): P[F, QuorumSet]
+
   /**
     * Q(v) => a function for generating quorums for a node
     * @param nodeId node id

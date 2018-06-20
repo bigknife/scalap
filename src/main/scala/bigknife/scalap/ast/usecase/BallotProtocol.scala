@@ -11,7 +11,9 @@ import bigknife.sop.implicits._
 trait BallotProtocol[F[_]] extends BaseProtocol[F] {
   import model._
 
-  def runBallotProtocol(slot: Slot, message: BallotMessage): SP[F, Result] = ???
+  def runBallotProtocol(slot: Slot, message: BallotMessage): SP[F, Result] = {
+    ???
+  }
 
   /**
     * bump state
