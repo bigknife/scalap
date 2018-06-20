@@ -4,6 +4,7 @@ import bigknife.scalap.ast.usecase._
 import bigknife.scalap.ast.types._
 import bigknife.scalap.ast.usecase.component._
 import bigknife.scalap.interpreter._
+import bigknife.scalap.interpreter.service.QuorumSetServiceHandler
 import cats.kernel.instances.hash
 import org.scalatest.FunSuite
 
@@ -15,15 +16,9 @@ class NominationProtocolSpec extends FunSuite {
   }
   def sha3(s: String): Array[Byte] = sha3(s.getBytes)
 
-  def hashOfQuorumSet(qs: QuorumSet): Hash = {
-    def _inner(qs: QuorumSet): Vector[Byte] = {
-      val bb = java.nio.ByteBuffer.allocate(4)
-      bb.putInt(qs.threshold)
-      val h1 = bb.array().toVector ++ qs.validators.flatMap(_.value.toVector)
-      val h2 = qs.innerSets.flatMap(x => _inner(x))
-      h1 ++ h2
-    }
-    Hash(misc.crypto.sha3(_inner(qs).toArray))
+  def hashOfQuorumSet(qs: QuorumSet, setting: Setting): Hash = {
+    val qsHandler = new QuorumSetServiceHandler
+    qsHandler.hashOfQuorumSet(qs)(setting).unsafeRunSync()
   }
 
   test("test program") {
@@ -62,9 +57,9 @@ class NominationProtocolSpec extends FunSuite {
 
     // first a nomination message from v2
     val nomV2 =
-      Message.Nominate(node2, slotIndex, Vector(value), Vector(value), hashOfQuorumSet(qs2))
+      Message.Nominate(node2, slotIndex, Vector(value), Vector(value), hashOfQuorumSet(qs2, setting1))
     val nomV3 =
-      Message.Nominate(node3, slotIndex, Vector(value), Vector(value), hashOfQuorumSet(qs3))
+      Message.Nominate(node3, slotIndex, Vector(value), Vector(value), hashOfQuorumSet(qs3, setting1))
 
     val msg1 = Message(nomV2, Signature.Empty)
     val msg2 = Message(nomV3, Signature.Empty)
