@@ -232,7 +232,16 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
     }
   }
 
-  private def attempPreparedConfirmed(slot: Slot, hint: BallotStatement): SP[F, Slot] = ???
+  private def attempPreparedConfirmed(slot: Slot, hint: BallotStatement): SP[F, Slot] = {
+    if (slot.ballotTracker.phase != Phase.Prepare || slot.ballotTracker.prepared.isEmpty) slot.pureSP[F]
+    else {
+      val candidatesSP: SP[F, Vector[Ballot]] = messageService.getPreparedCandidates(slot, hint)
+
+    }
+  }
+
+  private def findAcceptedCandidates(slot: Slot, ballots: Vector[Ballot]): SP[F, Option[Ballot]] = ???
+
   private def attempAcceptCommit(slot: Slot, hint: BallotStatement): SP[F, Slot]      = ???
   private def attempConfirmCommit(slot: Slot, hint: BallotStatement): SP[F, Slot]     = ???
   private def attempBump(slot: Slot): SP[F, Slot]                                     = ???
