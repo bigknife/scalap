@@ -4,6 +4,7 @@ package service
 import java.math.BigInteger
 
 import bigknife.scalap.ast.service.SlotService
+import bigknife.scalap.ast.types.BallotTracker.Phase
 import bigknife.scalap.ast.types.Node.ID
 import bigknife.scalap.ast.types._
 import org.bouncycastle.jcajce.provider.digest.SHA3
@@ -143,9 +144,21 @@ class SlotServiceHandler extends SlotService.Handler[Stack] {
       case None => slot.copy(ballotTracker = slot.ballotTracker.copy(prepared = Some(ballot)))
     }
 
-    //todo: setPreparedAccept see BallotProtocol.cpp#869
+    //setPreparedAccept see BallotProtocol.cpp#869
+    val ySlot = if (xSlot.ballotTracker.commit.isDefined && xSlot.ballotTracker.highBallot.isDefined) {
+      val c = xSlot.ballotTracker.commit.get
+      val h = xSlot.ballotTracker.highBallot.get
 
-    xSlot
+      if (xSlot.ballotTracker.prepared.exists(p => h <= p && !h.compatible(p)) ||
+        xSlot.ballotTracker.preparedPrime.exists(p => h <= p && !h.compatible(p))) {
+        require(xSlot.ballotTracker.phase == Phase.Prepare)
+        xSlot.copy(ballotTracker = xSlot.ballotTracker.copy(
+          commit = None
+        ))
+      } else xSlot
+    } else xSlot
+
+    ySlot
   }
 
   override def tryAdvanceSlotBallotMessageLevel(slot: Slot): Stack[(Slot, Boolean)] = Stack {
