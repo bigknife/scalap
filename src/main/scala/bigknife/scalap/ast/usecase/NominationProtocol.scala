@@ -20,13 +20,13 @@ trait NominationProtocol[F[_]] extends BaseProtocol[F] {
     * @param message nomination statement
     * @return
     */
-  def runNominationProtocol(slot: Slot, message: NominationMessage): SP[F, Result] = {
+  def runNominationProtocol(slot: Slot, message: NominationMessage, self: Boolean = false): SP[F, Result] = {
 
     val verify: SP[F, Boolean] = for {
       x <- isSane(message.statement)
       _ <- logService.info(s"is sane? $x for $message")
       y <- isNewer(slot, message.statement)
-      _ <- logService.info(s"isNewer? $x for $message")
+      _ <- logService.info(s"is newer? $x for $message")
     } yield x && y
 
     def votedPredict(value: Value) = Message.Statement.predict {
@@ -141,7 +141,7 @@ trait NominationProtocol[F[_]] extends BaseProtocol[F] {
         hash   <- quorumSetService.hashOfQuorumSet(qs)
         msg    <- messageService.createNominationMessage(slot, hash)
         _      <- logService.info(s"create new nomination message: $msg")
-        result <- runNominationProtocol(slot, msg)
+        result <- runNominationProtocol(slot, msg, self = true)
         _      <- logService.info(s"run nomination locally return $result")
         xSlot <- if (result._2 != Message.State.valid) result._1.pureSP[F]
         else {

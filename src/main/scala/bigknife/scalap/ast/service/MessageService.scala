@@ -15,6 +15,13 @@ import bigknife.sop.implicits._
   def isSaneNominationStatement(statement: NominationStatement): P[F, Boolean]
 
   /**
+    * compute statement to see if it's sane or not
+    * @param statement ballot statement
+    * @return
+    */
+  def isSaneBallotStatement(statement: BallotStatement, self: Boolean): P[F, Boolean]
+
+  /**
     * compute two nomination statement, return a newer one.
     * @param st1 statement 1
     * @param st2 statement 2
@@ -24,5 +31,11 @@ import bigknife.sop.implicits._
 
   def firstNominationStatementIsNewer(st1: NominationStatement, st2: NominationStatement): P[F, Boolean]
 
+  def firstBallotStatementIsNewer(st1: BallotStatement, st2: BallotStatement): P[F, Boolean]
+
   def createNominationMessage(slot: Slot, quorumSetHash: Hash): P[F, NominationMessage]
+
+  def getWorkingBallot(st: BallotStatement): P[F, Ballot]
+
+  def getPreparedCandidates(slot: Slot, st: BallotStatement): P[F, Vector[Ballot]]
 }

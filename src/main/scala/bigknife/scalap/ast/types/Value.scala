@@ -19,5 +19,9 @@ object Value {
     case object MaybeValid extends Validity {
       override def toString: String = "MaybeValid"
     }
+
+    def fullyValidated: Validity = FullyValidated
+    def invalid: Validity = Invalid
+    def maybeValid: Validity = MaybeValid
   }
 }

@@ -27,6 +27,18 @@ class SlotServiceHandler extends SlotService.Handler[Stack] {
       )
     }
 
+  override def tractNewBallotMessage(slot: Slot, ballotMessage: BallotMessage): Stack[Slot] =
+    Stack {
+      slot.copy(
+        ballotTracker = slot.ballotTracker.copy(
+          latestBallotMessages = slot.ballotTracker.latestBallotMessages + (ballotMessage.statement.nodeId -> ballotMessage)),
+        statementHistory = slot.statementHistory :+ Message.HistoricalStatement(
+          ballotMessage.statement,
+          System.currentTimeMillis(),
+          slot.fullValidated)
+      )
+    }
+
   override def acceptNomination(slot: Slot, value: Value): Stack[Slot] = Stack {
 
     slot.copy(
@@ -110,6 +122,57 @@ class SlotServiceHandler extends SlotService.Handler[Stack] {
         )
       )
     }
+
+  override def setPreparedBallot(slot: Slot, ballot: Ballot): Stack[Slot] = Stack {
+    val xSlot = slot.ballotTracker.prepared match {
+      case Some(p) =>
+        if (p < ballot) {
+          val npp = if (!p.compatible(ballot)) Option(p) else slot.ballotTracker.preparedPrime
+          val np  = Option(ballot)
+          slot.copy(
+            ballotTracker = slot.ballotTracker.copy(
+              prepared = np,
+              preparedPrime = npp
+            ))
+        } else if (p > ballot) {
+          // check if we should update only p'
+          if (slot.ballotTracker.preparedPrime.isEmpty || slot.ballotTracker.preparedPrime.get < ballot) {
+            slot.copy(ballotTracker = slot.ballotTracker.copy(preparedPrime = Option(ballot)))
+          } else slot
+        } else slot
+      case None => slot.copy(ballotTracker = slot.ballotTracker.copy(prepared = Some(ballot)))
+    }
+
+    //todo: setPreparedAccept see BallotProtocol.cpp#869
+
+    xSlot
+  }
+
+  override def tryAdvanceSlotBallotMessageLevel(slot: Slot): Stack[(Slot, Boolean)] = Stack {
+    setting =>
+      if (slot.ballotTracker.currentMessageLevel + 1 >= setting.maxBallotMessageLevel) (slot, false)
+      else
+        (slot.copy(
+           ballotTracker = slot.ballotTracker.copy(
+             currentMessageLevel = slot.ballotTracker.currentMessageLevel + 1)),
+         true)
+  }
+
+  override def backSlotBallotMessageLevel(slot: Slot): Stack[Slot] = Stack {
+    slot.copy(
+      ballotTracker = slot.ballotTracker.copy(
+        currentMessageLevel = slot.ballotTracker.currentMessageLevel - 1
+      )
+    )
+  }
+
+  override def hasAdvancedBallotProcess(s1: Slot, s2: Slot): Stack[Boolean] = Stack {
+    val bt1 = s1.ballotTracker
+    val bt2 = s2.ballotTracker
+    bt1.prepared != bt2.prepared ||
+    bt1.preparedPrime != bt2.preparedPrime ||
+    bt1.commit != bt2.commit
+  }
 }
 
 object SlotServiceHandler {

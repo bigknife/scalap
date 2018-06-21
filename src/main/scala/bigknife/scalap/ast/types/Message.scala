@@ -15,7 +15,7 @@ object Message {
     case object Invalid extends State {
       override def toString: String = "INVALID"
     }
-    def valid: State = Valid
+    def valid: State   = Valid
     def invalid: State = Invalid
   }
 
@@ -25,7 +25,9 @@ object Message {
     def quorumSetHash: Hash
   }
   sealed trait NominationStatement extends Statement
-  sealed trait BallotStatement extends Statement
+  sealed trait BallotStatement     extends Statement {
+    def order: Int
+  }
 
   // Nominate Message
   // see the paper, Nominate v, i, X, Y, D
@@ -37,11 +39,40 @@ object Message {
       quorumSetHash: Hash // D
   ) extends NominationStatement
 
+  case class Prepare(
+      nodeId: Node.ID, // v
+      slotIndex: Long, // i
+      quorumSetHash: Hash, // D
+      ballot: Option[Ballot], // b
+      prepared: Option[Ballot], // p
+      preparedPrime: Option[Ballot], // p'
+      nC: Int, // c.n
+      nH: Int // h.n
+  ) extends BallotStatement {
+    val order: Int = 0
+  }
+
+  case class Confirm(
+      nodeId: Node.ID, // v
+      slotIndex: Long, // i
+      quorumSetHash: Hash, // D
+      ballot: Option[Ballot], // b
+      nPrepared: Int, // p.n
+      nCommit: Int, // c.n
+      nH: Int // h.n
+  ) extends BallotStatement {
+    val order: Int = 1
+  }
+
   case class Externalize(
       nodeId: Node.ID, // v
       slotIndex: Long, // i
-      quorumSetHash: Hash // D
-  ) extends BallotStatement
+      quorumSetHash: Hash, // D
+      commit: Ballot, // c
+      nH: Int // h.n
+  ) extends BallotStatement {
+    val order: Int = 2
+  }
 
   // historical statement
   case class HistoricalStatement(

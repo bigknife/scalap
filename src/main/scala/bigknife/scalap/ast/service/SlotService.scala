@@ -1,7 +1,7 @@
 package bigknife.scalap.ast.service
 
 import bigknife.scalap.ast.types.Message.NominationStatement
-import bigknife.scalap.ast.types.{Node, NominationMessage, Slot, Value}
+import bigknife.scalap.ast.types._
 import bigknife.sop._
 import bigknife.sop.macros._
 import bigknife.sop.implicits._
@@ -31,6 +31,14 @@ import bigknife.sop.implicits._
     * @return
     */
   def trackNewNominationMessage(slot: Slot, nominationMessage: NominationMessage): P[F, Slot]
+
+  /** let slot tract the new coming ballot message
+    *
+    * @param slot slot
+    * @param ballotMessage coming ballot message
+    * @return
+    */
+  def tractNewBallotMessage(slot: Slot, ballotMessage: BallotMessage): P[F, Slot]
 
   /**
     * slot nomination accept a value when the value is fully validated
@@ -95,4 +103,34 @@ import bigknife.sop.implicits._
     * @return
     */
   def updateCompositeCandidateValue(slot: Slot, compositeValue: Value): P[F, Slot]
+
+  /**
+    * update slot's prepared
+    * @param slot slot
+    * @param ballot ballot to be set to prepare
+    * @return
+    */
+  def setPreparedBallot(slot: Slot, ballot: Ballot): P[F, Slot]
+
+  /**
+    * try to advance slot message level if the message level is permitted
+    * @param slot slot
+    * @return advanced slot and if successfully advanced
+    */
+  def tryAdvanceSlotBallotMessageLevel(slot: Slot): P[F, (Slot, Boolean)]
+
+  /**
+    * back the message level
+    * @param slot slot
+    * @return
+    */
+  def backSlotBallotMessageLevel(slot: Slot): P[F, Slot]
+
+  /**
+    * from the second parameters' point of view if has advanced for ballot
+    * @param s1 slot 1
+    * @param s2 slot 2
+    * @return
+    */
+  def hasAdvancedBallotProcess(s1: Slot, s2: Slot): P[F, Boolean]
 }

@@ -7,8 +7,11 @@ package object types {
   type BallotMessage     = Message[Message.BallotStatement]
   type MessageState      = Message.State
 
-  type NominationStatement = Message.NominationStatement
-  type BallotStatement     = Message.BallotStatement
+  type NominationStatement        = Message.NominationStatement
+  type BallotStatement            = Message.BallotStatement
+  type BallotPrepareStatement     = Message.Prepare
+  type BallotConfirmStatement     = Message.Confirm
+  type BallotExternalizeStatement = Message.Externalize
 
   type StatementPredict = Message.Statement.Predict
 

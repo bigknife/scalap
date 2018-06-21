@@ -27,6 +27,13 @@ trait BaseProtocol[F[_]] {
   def validateNominationValue(value: Value): SP[F, Value.Validity]
 
   /**
+    * validate a ballot value's validity
+    * @param value value
+    * @return
+    */
+  def validateBallotValue(value: Value): SP[F, Value.Validity]
+
+  /**
     * try to transforms a value to a fully validted value that the local node would agree to
     * @param slot slot
     * @param value value(not fully validated)

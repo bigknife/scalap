@@ -26,6 +26,9 @@ trait SCPTest[F[_]] extends SCP[F] {
   override def validateNominationValue(value: Value): SP[F, Value.Validity] =
     (Value.Validity.FullyValidated: Value.Validity).pureSP[F]
 
+  override def validateBallotValue(value: Value): SP[F, Value.Validity] =
+    (Value.Validity.FullyValidated: Value.Validity).pureSP[F]
+
   /**
     * try to transforms a value to a fully validted value that the local node would agree to
     *
@@ -33,7 +36,8 @@ trait SCPTest[F[_]] extends SCP[F] {
     * @param value value(not fully validated)
     * @return
     */
-  override def extractValidValue(slot: Slot, value: Value): SP[F, Option[Value]] = Option.empty[Value].pureSP[F]
+  override def extractValidValue(slot: Slot, value: Value): SP[F, Option[Value]] =
+    Option.empty[Value].pureSP[F]
 
   /**
     * emit message to other nodes

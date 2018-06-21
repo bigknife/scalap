@@ -12,7 +12,7 @@ import bigknife.sop.implicits._
     * @param quorumSet quorum set
     * @return
     */
-  def isQuorumSetSane(quorumSet: QuorumSet): P[F, Boolean]
+  def isQuorumSetSane(quorumSet: QuorumSet, extractChecks: Boolean): P[F, Boolean]
 
   /**
     * create a singleton quorum set for a node
