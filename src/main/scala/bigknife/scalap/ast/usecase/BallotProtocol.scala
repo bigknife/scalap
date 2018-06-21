@@ -166,6 +166,8 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
           xSlot <- if (acceptedOpt.isDefined)
             slotService.setPreparedBallot(slot, acceptedOpt.get): SP[F, Slot]
           else slot.pureSP[F]
+          advanced <- slotService.hasAdvancedBallotProcess(slot, xSlot)
+          _        <- if (advanced) emitCurrentStatement(xSlot) else ().pureSP[F]
         } yield xSlot
 
     }
@@ -238,4 +240,5 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
   private def attempBump(slot: Slot): SP[F, Slot]                                     = ???
   private def checkHeardFromQuorum(slot: Slot): SP[F, Slot]                           = ???
   private def sendLatestEnvelope(slot: Slot): SP[F, Unit]                             = ???
+  private def emitCurrentStatement(slot: Slot): SP[F, Unit]                           = ???
 }
