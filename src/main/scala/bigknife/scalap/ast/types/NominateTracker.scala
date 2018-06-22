@@ -11,7 +11,7 @@ case class NominateTracker(
     lastEmittedMessage: Option[NominationMessage], // last message emitted by this node
     roundLeaders: Vector[Node.ID], // nodes from quorum set that have the highest priority this round
     nominationStarted: Boolean, // true if nominate protocol start
-    latestCompositedCandidate: Option[Value], // the latest candidate value
+    latestCompositeCandidate: Option[Value], // the latest candidate value
     previousValue: Option[Value] // the value from the previous slot
 )
 

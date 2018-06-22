@@ -112,6 +112,14 @@ import bigknife.sop.implicits._
     */
   def setPreparedBallot(slot: Slot, ballot: Ballot): P[F, Slot]
 
+  def setPreparedConfirmed(slot: Slot, newC: Option[Ballot], newH: Option[Ballot]): P[F, Slot]
+
+  def setBumpBallot(slot: Slot, ballot: Ballot, bumped: Boolean): P[F, Slot]
+
+  def setAcceptCommit(slot: Slot, commit: Ballot, high: Ballot): P[F, Slot]
+
+  def setConfirmCommit(slot: Slot, commit: Ballot, high: Ballot): P[F, Slot]
+
   /**
     * try to advance slot message level if the message level is permitted
     * @param slot slot

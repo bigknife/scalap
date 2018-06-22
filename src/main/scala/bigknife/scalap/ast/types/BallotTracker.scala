@@ -8,6 +8,7 @@ import bigknife.scalap.ast.types.BallotTracker.Phase
 case class BallotTracker(
     phase: Phase = Phase.Prepare,
     currentMessageLevel: Int = 0,
+    heardFromQuorum: Boolean = false,
     currentBallot: Option[Ballot] = None, // b, current ballot that node v is attempting to prepare and commit
     prepared: Option[Ballot] = None, // p
     preparedPrime: Option[Ballot] = None, // p', p and p' is two highest ballot, and p' is less than and incompatible to p

@@ -11,6 +11,13 @@ case class Ballot(
     else this.value.compare(that.value)
   }
 
+  override def hashCode(): Int = counter.hashCode() + value.hashCode()
+
+  override def equals(obj: scala.Any): Boolean = obj match {
+    case Ballot(c, v) => this.counter == c && this.value == v
+    case _            => false
+  }
+
   // see the paper 6.2
   def lessThan(that: Ballot): Boolean     = this.counter <= that.counter
   def compatible(that: Ballot): Boolean   = this.value == that.value
