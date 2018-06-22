@@ -99,10 +99,48 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
     * @param candidate composite candidate value
     * @return
     */
-  final def bumpState(slot: Slot, candidate: Value): SP[F, Unit] = {
-    for {
-      _ <- logService.info(s"//TODO: bump state: $candidate")
-    } yield ()
+  final def bumpState(slot: Slot, candidate: Value, force: Boolean): SP[F, Slot] = {
+    if (!force && slot.ballotTracker.currentBallot.isDefined) slot.pureSP[F]
+    else {
+      val n = slot.ballotTracker.currentBallot.map(_.counter + 1).getOrElse(1)
+      bumpState(slot, candidate, n)
+    }
+  }
+
+  final def bumpState(slot: Slot, candidate: Value, n: Int): SP[F, Slot] = {
+    def updateCurrentValue(slot: Slot, ballot: Ballot): SP[F, Slot] = {
+      slot.ballotTracker.phase match {
+        case Phase.Externalized => slot.pureSP[F]
+        case _ =>
+          val current = slot.ballotTracker.currentBallot
+          val commit  = slot.ballotTracker.commit
+          // conditions to bumpToBallot
+          val cond1 = current.isEmpty
+          val cond2 = (current.get < ballot) && !(commit.isDefined && !commit.get.compatible(
+            ballot))
+
+          for {
+            xSlot <- if (cond1 || cond2) bumpToBallot(slot, ballot, check = true)
+            else slot.pureSP[F]
+            _ <- checkInvariant(xSlot)
+          } yield xSlot
+      }
+    }
+
+    slot.ballotTracker.phase match {
+      case Phase.Externalized => slot.pureSP[F]
+      case _ =>
+        val newB = Ballot(n, slot.ballotTracker.highBallot.map(_.value).getOrElse(candidate))
+        for {
+          xSlot    <- updateCurrentValue(slot, newB)
+          modified <- slotService.hasAdvancedBallotProcess(slot, xSlot)
+          ySlot <- if (modified) for {
+            _  <- emitCurrentStatement(xSlot)
+            s0 <- checkHeardFromQuorum(xSlot)
+          } yield s0
+          else xSlot.pureSP[F]
+        } yield ySlot
+    }
   }
 
   private def isSane(statement: BallotStatement, self: Boolean): SP[F, Boolean] = {
@@ -420,10 +458,125 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
     }
   }
 
-  private def attemptBump(slot: Slot): SP[F, Slot]          = ???
+  private def attemptBump(slot: Slot): SP[F, Slot] = {
+    slot.ballotTracker.phase match {
+      case Phase.Externalized => slot.pureSP[F]
+      case _ =>
+        val currentBallotOpt = slot.ballotTracker.currentBallot
+        val latestMsgs       = slot.ballotTracker.latestBallotMessages
+
+        val targetCounter = currentBallotOpt.map(_.counter).getOrElse(0)
+
+        val allCounters = latestMsgs
+          .foldLeft(Set(targetCounter)) {
+            case (acc, (_, msg)) =>
+              msg.statement match {
+                case x: BallotPrepareStatement     => acc + x.ballot.get.counter
+                case x: BallotConfirmStatement     => acc + x.ballot.get.counter
+                case x: BallotExternalizeStatement => acc + Int.MaxValue
+              }
+          }
+          .toVector
+          .sorted
+
+        // go through the counters, find the smallest not v-blocking
+        def filterNodeIds(slot: Slot, n: Int): Vector[Node.ID] =
+          slot.ballotTracker.latestBallotMessages
+            .filter {
+              case (_, msg) =>
+                msg.statement match {
+                  case x: BallotPrepareStatement =>
+                    n < x.ballot.get.counter
+                  case x: BallotConfirmStatement =>
+                    n < x.ballot.get.counter
+                  case _ => n != Int.MaxValue
+                }
+            }
+            .keys
+            .toVector
+
+        def findSmallestNotVBlocking(slot: Slot, counters: Vector[Int]): SP[F, Option[Int]] = {
+          counters
+            .foldLeft((Option.empty[Int], false).pureSP[F]) { (acc, n) =>
+              for {
+                pre <- acc
+                x <- if (pre._2) acc
+                else
+                  for {
+                    qs <- quorumSetService.quorumFunction(slot.nodeId): SP[F, QuorumSet]
+                    vBlocking <- quorumSetService.isVBlocking(qs, filterNodeIds(slot, n)): SP[
+                      F,
+                      Boolean]
+                    x0 <- if (n == targetCounter && !vBlocking) (pre._1, true).pureSP[F]
+                    else {
+                      if (!vBlocking) (Option(n), true).pureSP[F] else acc
+                    }
+                  } yield x0
+              } yield x
+            }
+            .map(_._1)
+        }
+
+        for {
+          iOpt  <- findSmallestNotVBlocking(slot, allCounters)
+          xSlot <- if (iOpt.isEmpty) slot.pureSP[F] else abandonBallot(slot, iOpt.get)
+        } yield xSlot
+    }
+  }
+  private def abandonBallot(slot: Slot, n: Int): SP[F, Slot] = {
+    val v = slot.nominateTracker.latestCompositeCandidate
+      .orElse(slot.ballotTracker.currentBallot.map(_.value))
+    if (v.isEmpty) slot.pureSP[F]
+    else {
+      if (n == 0) bumpState(slot, v.get, force = true)
+      else bumpState(slot, v.get, n)
+    }
+  }
+
   private def checkHeardFromQuorum(slot: Slot): SP[F, Slot] = ???
   private def sendLatestEnvelope(slot: Slot): SP[F, Unit]   = ???
   private def emitCurrentStatement(slot: Slot): SP[F, Unit] = ???
+
+  private def checkInvariant(slot: Slot): SP[F, Unit] = {
+    // only log(error) now
+    val phase        = slot.ballotTracker.phase
+    val current      = slot.ballotTracker.currentBallot
+    val prepare      = slot.ballotTracker.prepared
+    val preparePrime = slot.ballotTracker.preparedPrime
+    val commit       = slot.ballotTracker.commit
+    val high         = slot.ballotTracker.highBallot
+    def areBallotsLessAndIncompatible(b1: Ballot, b2: Ballot): Boolean =
+      b1 <= b2 && !b1.compatible(b2)
+    for {
+      _ <- if (phase == Phase.Confirm && commit.isEmpty)
+        logService.error("when Phase.Confirm, commit should not be empty"): SP[F, Unit]
+      else ().pureSP[F]
+      _ <- if (phase == Phase.Externalized && (commit.isEmpty || high.isEmpty))
+        logService.error("when Phase.Confirm, commit and high should not be empty"): SP[F, Unit]
+      else ().pureSP[F]
+      _ <- if (current.isDefined && current.get.counter <= 0)
+        logService.error("current ballot's counter should <= 0"): SP[F, Unit]
+      else ().pureSP[F]
+      _ <- if (prepare.isDefined && preparePrime.isDefined && !areBallotsLessAndIncompatible(
+                 preparePrime.get,
+                 prepare.get))
+        logService.error("preparePrime should less than and incompatible to prepare"): SP[F, Unit]
+      else ().pureSP[F]
+      _ <- if (commit.isDefined && current.isEmpty)
+        logService.error("when commit is defined, current ballot should be empty"): SP[F, Unit]
+      else ().pureSP[F]
+      _ <- if (commit.isDefined && !areBallotsLessAndIncompatible(commit.get, high.get))
+        logService.error("when commit is defined, commit should less than and incompatible to high"): SP[
+          F,
+          Unit]
+      else ().pureSP[F]
+      _ <- if (commit.isDefined && !areBallotsLessAndIncompatible(high.get, current.get))
+        logService.error(
+          "when commit is defined, high should less than and incompatible to current"): SP[F, Unit]
+      else ().pureSP[F]
+
+    } yield ()
+  }
 
   private def bumpToBallot(slot: Slot, ballot: Ballot, check: Boolean): SP[F, Slot] = {
     val gotBumped = slot.ballotTracker.currentBallot.isEmpty || slot.ballotTracker.currentBallot.get.counter != ballot.counter

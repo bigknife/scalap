@@ -168,8 +168,8 @@ trait NominationProtocol[F[_]] extends BaseProtocol[F] {
       for {
         composite <- applicationExtension.combineValues(slot.nominateTracker.candidates)
         xSlot     <- slotService.updateCompositeCandidateValue(slot, composite)
-        _         <- ballotProtocol.bumpState(xSlot, composite)
-      } yield xSlot
+        ySlot         <- ballotProtocol.bumpState(xSlot, composite, force = false)
+      } yield ySlot
     }
 
     val process: SP[F, Result] = for {
