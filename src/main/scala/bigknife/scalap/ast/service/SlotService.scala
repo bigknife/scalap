@@ -80,6 +80,8 @@ import bigknife.sop.implicits._
     */
   def emitNominateMessage(slot: Slot, message: NominationMessage): P[F, Slot]
 
+  def emitLatestBallotMessage(slot: Slot): P[F, Slot]
+
   /**
     * compute two slot,determine they are same or not, only concern voted and accepted, candidates ignored
     * @param s1 slot 1

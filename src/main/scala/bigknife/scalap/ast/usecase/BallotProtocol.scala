@@ -37,8 +37,8 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
             s5      <- checkHeardFromQuorum(s4)
             s6      <- slotService.backSlotBallotMessageLevel(s5)
             didWork <- slotService.hasAdvancedBallotProcess(slot, s6)
-            _       <- if (didWork) sendLatestEnvelope(s6) else ().pureSP[F]
-            r1      <- validResult(s6)
+            s7       <- if (didWork) sendLatestEnvelope(s6) else s6.pureSP[F]
+            r1      <- validResult(s7)
           } yield r1
       } yield r
     }
@@ -596,7 +596,16 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
 
     } else slot.pureSP[F]
   }
-  private def sendLatestEnvelope(slot: Slot): SP[F, Unit]   = ???
+  private def sendLatestEnvelope(slot: Slot): SP[F, Slot]   = {
+    if (slot.ballotTracker.currentMessageLevel == 0 && slot.ballotTracker.lastMessage.isDefined && slot.fullValidated) {
+      if (slot.ballotTracker.lastEmittedMessage.isEmpty || !slot.ballotTracker.lastMessage.contains(slot.ballotTracker.lastEmittedMessage.get)) {
+        for {
+          xSlot <- slotService.emitLatestBallotMessage(slot)
+          _ <- applicationExtension.emitMessage(xSlot.ballotTracker.lastEmittedMessage.get)
+        } yield xSlot
+      } else slot.pureSP[F]
+    } else slot.pureSP[F]
+  }
   private def emitCurrentStatement(slot: Slot): SP[F, Unit] = ???
 
   private def checkInvariant(slot: Slot): SP[F, Unit] = {
@@ -670,7 +679,7 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
 
   private def getCommitBoundariesFromStatements(slot: Slot, ballot: Ballot): Vector[Int] = {
     slot.ballotTracker.latestBallotMessages.foldLeft(Vector.empty[Int]) {
-      case (acc, (nodeId, msg)) =>
+      case (acc, (_, msg)) =>
         msg.statement match {
           case x: BallotPrepareStatement =>
             if (ballot.compatible(x.ballot.get) && x.nC > 0) {

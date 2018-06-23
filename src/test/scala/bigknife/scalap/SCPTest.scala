@@ -38,17 +38,6 @@ trait SCPTest[F[_]] extends SCP[F] {
     */
   override def extractValidValue(slot: Slot, value: Value): SP[F, Option[Value]] =
     Option.empty[Value].pureSP[F]
-
-  /**
-    * emit message to other nodes
-    *
-    * @param message message
-    * @return
-    */
-  override def emitMessage(message: StatementMessage): SP[F, Unit] = {
-    println(s"emit message: $message")
-    ().pureSP[F]
-  }
 }
 
 object SCPTest {

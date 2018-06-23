@@ -41,12 +41,7 @@ trait BaseProtocol[F[_]] {
     */
   def extractValidValue(slot: Slot, value: Value): SP[F, Option[Value]]
 
-  /**
-    * emit message to other nodes
-    * @param message message
-    * @return
-    */
-  def emitMessage(message: StatementMessage): SP[F, Unit]
+
 
   /**
     * get quorum set from a statement

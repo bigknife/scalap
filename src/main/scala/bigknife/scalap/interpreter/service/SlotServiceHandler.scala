@@ -251,6 +251,12 @@ class SlotServiceHandler extends SlotService.Handler[Stack] {
   override def setHeardFromQuorum(slot: Slot, heard: Boolean): Stack[Slot] = Stack {
     slot.copy(ballotTracker = slot.ballotTracker.copy(heardFromQuorum = heard))
   }
+
+  override def emitLatestBallotMessage(slot: Slot): Stack[Slot] = Stack {
+    slot.copy(ballotTracker = slot.ballotTracker.copy(
+      lastEmittedMessage = slot.ballotTracker.lastMessage
+    ))
+  }
 }
 
 object SlotServiceHandler {

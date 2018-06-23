@@ -20,4 +20,11 @@ import bigknife.sop.implicits._
   def startBallotProtocolTimer(slot: Slot): P[F, Unit]
   def stopBallotProtocolTimer(slot: Slot): P[F, Unit]
   def ballotDidHearFromQuorum(slot: Slot, ballot: Ballot): P[F, Unit]
+
+  /**
+    * emit message to other nodes
+    * @param message message
+    * @return
+    */
+  def emitMessage(message: StatementMessage): P[F, Unit]
 }

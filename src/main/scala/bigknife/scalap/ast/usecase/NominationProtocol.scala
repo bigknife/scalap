@@ -156,7 +156,7 @@ trait NominationProtocol[F[_]] extends BaseProtocol[F] {
 
             s0 <- if (isNew) for {
               s1 <- slotService.emitNominateMessage(result._1, msg): SP[F, Slot]
-              _  <- if (slot.fullValidated) emitMessage(msg): SP[F, Unit] else ().pureSP[F]
+              _  <- if (slot.fullValidated) applicationExtension.emitMessage(msg): SP[F, Unit] else ().pureSP[F]
             } yield s1
             else result._1.pureSP[F]
           } yield s0

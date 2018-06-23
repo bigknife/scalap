@@ -14,7 +14,9 @@ case class BallotTracker(
     preparedPrime: Option[Ballot] = None, // p', p and p' is two highest ballot, and p' is less than and incompatible to p
     highBallot: Option[Ballot] = None, // h
     commit: Option[Ballot] = None, // c
-    latestBallotMessages: Map[Node.ID, BallotMessage] = Map.empty // M
+    latestBallotMessages: Map[Node.ID, BallotMessage] = Map.empty, // M
+    lastMessage: Option[BallotMessage] = None,
+    lastEmittedMessage: Option[BallotMessage] = None
 )
 object BallotTracker {
 
