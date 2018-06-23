@@ -257,6 +257,14 @@ class SlotServiceHandler extends SlotService.Handler[Stack] {
       lastEmittedMessage = slot.ballotTracker.lastMessage
     ))
   }
+
+  override def emitBallotMessage(slot: Slot, message: BallotMessage): Stack[Slot] = Stack {
+    slot.copy(
+      ballotTracker = slot.ballotTracker.copy(
+        lastEmittedMessage = Some(message)
+      )
+    )
+  }
 }
 
 object SlotServiceHandler {

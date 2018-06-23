@@ -37,7 +37,7 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
             s5      <- checkHeardFromQuorum(s4)
             s6      <- slotService.backSlotBallotMessageLevel(s5)
             didWork <- slotService.hasAdvancedBallotProcess(slot, s6)
-            s7       <- if (didWork) sendLatestEnvelope(s6) else s6.pureSP[F]
+            s7      <- if (didWork) sendLatestEnvelope(s6) else s6.pureSP[F]
             r1      <- validResult(s7)
           } yield r1
       } yield r
@@ -451,8 +451,8 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
         modified <- slotService.hasAdvancedBallotProcess(slot, xSlot)
         ySlot <- if (modified) for {
           s0 <- updateCurrentIfNeeded(xSlot)
-          _  <- emitCurrentStatement(s0)
-        } yield s0
+          s1 <- emitCurrentStatement(s0)
+        } yield s1
         else xSlot.pureSP[F]
       } yield ySlot
     }
@@ -596,17 +596,49 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
 
     } else slot.pureSP[F]
   }
-  private def sendLatestEnvelope(slot: Slot): SP[F, Slot]   = {
+  private def sendLatestEnvelope(slot: Slot): SP[F, Slot] = {
     if (slot.ballotTracker.currentMessageLevel == 0 && slot.ballotTracker.lastMessage.isDefined && slot.fullValidated) {
-      if (slot.ballotTracker.lastEmittedMessage.isEmpty || !slot.ballotTracker.lastMessage.contains(slot.ballotTracker.lastEmittedMessage.get)) {
+      if (slot.ballotTracker.lastEmittedMessage.isEmpty || !slot.ballotTracker.lastMessage.contains(
+            slot.ballotTracker.lastEmittedMessage.get)) {
         for {
           xSlot <- slotService.emitLatestBallotMessage(slot)
-          _ <- applicationExtension.emitMessage(xSlot.ballotTracker.lastEmittedMessage.get)
+          _     <- applicationExtension.emitMessage(xSlot.ballotTracker.lastEmittedMessage.get)
         } yield xSlot
       } else slot.pureSP[F]
     } else slot.pureSP[F]
   }
-  private def emitCurrentStatement(slot: Slot): SP[F, Unit] = ???
+  private def emitCurrentStatement(slot: Slot): SP[F, Slot] = {
+    val lastMsg = slot.ballotTracker.latestBallotMessages.get(slot.nodeId)
+    def shouldSend(msg: BallotMessage): SP[F, Boolean] =
+      for {
+        cond1 <- slot.ballotTracker.currentBallot.isDefined.pureSP[F]
+        cond2 <- if (slot.ballotTracker.lastMessage.isDefined)
+          messageService.firstBallotStatementIsNewer(
+            msg.statement,
+            slot.ballotTracker.lastMessage.get.statement): SP[F, Boolean]
+        else true.pureSP[F]
+      } yield cond1 && cond2
+
+    for {
+      _      <- checkInvariant(slot)
+      qs     <- quorumSetService.quorumFunction(slot.nodeId)
+      qsHash <- quorumSetService.hashOfQuorumSet(qs)
+      msg    <- messageService.createBallotMessage(slot, qsHash)
+      xSlot <- if (lastMsg.isEmpty || lastMsg.get != msg) for {
+        result <- runBallotProtocol(slot, msg, self = true)
+        s0 <- if (result._2 == Message.State.Valid) for {
+          send <- shouldSend(msg)
+          s3 <- if (send) for {
+            s1 <- slotService.emitBallotMessage(result._1, msg)
+            s2 <- sendLatestEnvelope(s1)
+          } yield s2
+          else result._1.pureSP[F]
+        } yield s3
+        else result._1.pureSP[F]
+      } yield s0
+      else slot.pureSP[F]
+    } yield xSlot
+  }
 
   private def checkInvariant(slot: Slot): SP[F, Unit] = {
     // only log(error) now

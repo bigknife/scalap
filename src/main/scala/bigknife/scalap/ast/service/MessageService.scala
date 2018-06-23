@@ -35,6 +35,8 @@ import bigknife.sop.implicits._
 
   def createNominationMessage(slot: Slot, quorumSetHash: Hash): P[F, NominationMessage]
 
+  def createBallotMessage(slot: Slot, quorumSetHash: Hash): P[F, BallotMessage]
+
   def getWorkingBallot(st: BallotStatement): P[F, Ballot]
 
   def getPreparedCandidates(slot: Slot, st: BallotStatement): P[F, Vector[Ballot]]

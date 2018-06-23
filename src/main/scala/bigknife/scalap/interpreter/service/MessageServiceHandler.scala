@@ -3,6 +3,7 @@ package service
 
 import bigknife.scalap.ast.service.MessageService
 import bigknife.scalap.ast.types
+import bigknife.scalap.ast.types.BallotTracker.Phase
 import bigknife.scalap.ast.types._
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -46,6 +47,7 @@ class MessageServiceHandler extends MessageService.Handler[Stack] {
 
   override def createNominationMessage(slot: Slot, quorumSetHash: Hash): Stack[NominationMessage] =
     Stack {
+      // todo sign the message
       val nominate = Message.Nominate(
         nodeId = slot.nodeId,
         slotIndex = slot.index,
@@ -193,6 +195,49 @@ class MessageServiceHandler extends MessageService.Handler[Stack] {
         }
       }
     }
+
+  override def createBallotMessage(slot: Slot, quorumSetHash: Hash): Stack[BallotMessage] = Stack {
+    //todo sign the message
+    slot.ballotTracker.phase match {
+      case Phase.Prepare =>
+        Message(
+          Message.Prepare(
+            slot.nodeId,
+            slot.index,
+            quorumSetHash,
+            slot.ballotTracker.currentBallot,
+            slot.ballotTracker.prepared,
+            slot.ballotTracker.preparedPrime,
+            slot.ballotTracker.commit.map(_.counter).getOrElse(0),
+            slot.ballotTracker.highBallot.map(_.counter).getOrElse(0)
+          ),
+          Signature.Empty
+        )
+      case Phase.Confirm =>
+        Message(
+          Message.Confirm(
+            slot.nodeId,
+            slot.index,
+            quorumSetHash,
+            slot.ballotTracker.currentBallot,
+            slot.ballotTracker.prepared.map(_.counter).getOrElse(0),
+            slot.ballotTracker.commit.map(_.counter).getOrElse(0),
+            slot.ballotTracker.highBallot.map(_.counter).getOrElse(0)
+          ),
+          Signature.Empty
+        )
+      case Phase.Externalized =>
+        Message(
+          Message.Externalize(slot.nodeId,
+                              slot.index,
+                              quorumSetHash,
+                              slot.ballotTracker.commit.get,
+                              slot.ballotTracker.highBallot.map(_.counter).getOrElse(0)),
+          Signature.Empty
+        )
+
+    }
+  }
 
   private def areBallotsLessAndCompatible(b1: Ballot, b2: Ballot): Boolean =
     compareBallotOpt(Some(b1), Some(b2)) <= 0 && b1.compatible(b2)
