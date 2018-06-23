@@ -247,6 +247,10 @@ class SlotServiceHandler extends SlotService.Handler[Stack] {
     bt1.preparedPrime != bt2.preparedPrime ||
     bt1.commit != bt2.commit
   }
+
+  override def setHeardFromQuorum(slot: Slot, heard: Boolean): Stack[Slot] = Stack {
+    slot.copy(ballotTracker = slot.ballotTracker.copy(heardFromQuorum = heard))
+  }
 }
 
 object SlotServiceHandler {

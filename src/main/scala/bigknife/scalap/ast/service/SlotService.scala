@@ -120,6 +120,8 @@ import bigknife.sop.implicits._
 
   def setConfirmCommit(slot: Slot, commit: Ballot, high: Ballot): P[F, Slot]
 
+  def setHeardFromQuorum(slot: Slot, heard: Boolean): P[F, Slot]
+
   /**
     * try to advance slot message level if the message level is permitted
     * @param slot slot

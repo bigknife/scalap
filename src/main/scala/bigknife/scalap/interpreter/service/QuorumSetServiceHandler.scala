@@ -82,8 +82,8 @@ class QuorumSetServiceHandler extends QuorumSetService.Handler[Stack] {
 
   override def isQuorumSlice(quorumSet: QuorumSet, nodes: Vector[Node.ID]): Stack[Boolean] = Stack {
     def isQuorumSliceInternal(quorumSet: QuorumSet, nodes: Vector[Node.ID]): Boolean = {
-      val threasoldLeft = quorumSet.threshold
-      val leftLevel1 = quorumSet.validators.foldLeft(threasoldLeft) { (acc, n) =>
+      val thresholdLeft = quorumSet.threshold
+      val leftLevel1 = quorumSet.validators.foldLeft(thresholdLeft) { (acc, n) =>
         if (nodes.contains(n)) acc - 1
         else acc
       }

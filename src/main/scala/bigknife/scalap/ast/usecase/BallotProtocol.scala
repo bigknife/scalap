@@ -533,7 +533,69 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
     }
   }
 
-  private def checkHeardFromQuorum(slot: Slot): SP[F, Slot] = ???
+  private def checkHeardFromQuorum(slot: Slot): SP[F, Slot] = {
+    val current = slot.ballotTracker.currentBallot
+    val filter: Message.Statement => Boolean = {
+      case x: BallotPrepareStatement =>
+        (for {
+          x1 <- slot.ballotTracker.currentBallot
+          x2 <- x.ballot
+        } yield x1 <= x2).getOrElse(false)
+      case _ => true
+    }
+    if (current.isDefined) {
+      for {
+        qs <- quorumSetService.quorumFunction(slot.nodeId)
+        isQ <- {
+          // isQuorum
+          val filteredNodes = slot.ballotTracker.latestBallotMessages
+            .filter(x => filter(x._2.statement))
+            .keys
+            .toVector
+          val qsNodesSP: SP[F, Vector[Node.ID]] = filteredNodes.foldLeft(filteredNodes.pureSP[F]) {
+            (acc, n) =>
+              for {
+                pre <- acc
+                qsOpt <- getQuorumSetFromStatement(
+                  slot.ballotTracker.latestBallotMessages(n).statement)
+                x <- if (qsOpt.isEmpty) pre.filter(_ != n).pureSP[F]
+                else
+                  for {
+                    isQs <- quorumSetService.isQuorumSlice(qsOpt.get, pre)
+                    x0   <- (if (isQs) pre else pre.filter(_ != n)).pureSP[F]
+                  } yield x0
+              } yield x
+          }
+
+          for {
+            qsNodes <- qsNodesSP
+            isQs    <- quorumSetService.isQuorumSlice(qs, qsNodes): SP[F, Boolean]
+          } yield isQs
+        }
+
+        xSlot <- if (isQ) {
+          slot.ballotTracker.phase match {
+            case Phase.Externalized =>
+              for {
+                _ <- applicationExtension.stopBallotProtocolTimer(slot): SP[F, Unit]
+              } yield slot
+            case _ =>
+              val heardEver = slot.ballotTracker.heardFromQuorum
+              for {
+                _ <- applicationExtension.ballotDidHearFromQuorum(slot, current.get)
+                s0 <- if (heardEver) slot.pureSP[F]
+                else
+                  for {
+                    _  <- applicationExtension.startBallotProtocolTimer(slot): SP[F, Unit]
+                    s1 <- slotService.setHeardFromQuorum(slot, heard = true): SP[F, Slot]
+                  } yield s1
+              } yield s0
+          }
+        } else slot.pureSP[F]
+      } yield xSlot
+
+    } else slot.pureSP[F]
+  }
   private def sendLatestEnvelope(slot: Slot): SP[F, Unit]   = ???
   private def emitCurrentStatement(slot: Slot): SP[F, Unit] = ???
 

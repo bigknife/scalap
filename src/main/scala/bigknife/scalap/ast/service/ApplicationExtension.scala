@@ -15,4 +15,9 @@ import bigknife.sop.implicits._
     * @return
     */
   def combineValues(values: Vector[Value]): P[F, Value]
+
+  // ballot protocol timer
+  def startBallotProtocolTimer(slot: Slot): P[F, Unit]
+  def stopBallotProtocolTimer(slot: Slot): P[F, Unit]
+  def ballotDidHearFromQuorum(slot: Slot, ballot: Ballot): P[F, Unit]
 }
