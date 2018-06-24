@@ -116,7 +116,7 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
           val commit  = slot.ballotTracker.commit
           // conditions to bumpToBallot
           val cond1 = current.isEmpty
-          val cond2 = (current.get < ballot) && !(commit.isDefined && !commit.get.compatible(
+          lazy val cond2 = (current.get < ballot) && !(commit.isDefined && !commit.get.compatible(
             ballot))
 
           for {
@@ -229,10 +229,10 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
       // if we already prepared this ballot, don't bother checking again
 
       // if ballot <= p' ballot is neither a candidate for p nor p'
-      val cond2 = slot.ballotTracker.preparedPrime.isDefined && (n <= slot.ballotTracker.preparedPrime.get)
+      lazy val cond2 = slot.ballotTracker.preparedPrime.isDefined && (n <= slot.ballotTracker.preparedPrime.get)
 
       // if ballot is already covered by p, skip
-      val cond3 = slot.ballotTracker.prepared.isDefined && (n <= slot.ballotTracker.prepared.get && n
+      lazy val cond3 = slot.ballotTracker.prepared.isDefined && (n <= slot.ballotTracker.prepared.get && n
         .compatible(slot.ballotTracker.prepared.get))
 
       // predict
@@ -357,16 +357,16 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
       case x: BallotConfirmStatement     => Some(Ballot(x.nH, x.ballot.get.value))
       case x: BallotExternalizeStatement => Some(Ballot(x.nH, x.commit.value))
     }
-    val cond2 = ballotOpt.isEmpty
+    lazy val cond2 = ballotOpt.isEmpty
 
-    val cond3 = slot.ballotTracker.phase match {
+    lazy val cond3 = slot.ballotTracker.phase match {
       case Phase.Confirm if ballotOpt.isDefined && slot.ballotTracker.highBallot.isDefined =>
         !ballotOpt.get.compatible(slot.ballotTracker.highBallot.get)
       case _ => true
     }
 
     val boundaries = getCommitBoundariesFromStatements(slot, ballotOpt.get)
-    val cond4      = boundaries.isEmpty
+    lazy val cond4      = boundaries.isEmpty
 
     def votedPredict(interval: Interval): Message.Statement.Predict = Message.Statement.predict {
       case x: BallotPrepareStatement =>
@@ -420,14 +420,14 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
 
   private def attemptConfirmCommit(slot: Slot, hint: BallotStatement): SP[F, Slot] = {
     val cond1 = slot.ballotTracker.phase != Phase.Confirm
-    val cond2 = slot.ballotTracker.highBallot.isEmpty || slot.ballotTracker.commit.isEmpty
+    lazy val cond2 = slot.ballotTracker.highBallot.isEmpty || slot.ballotTracker.commit.isEmpty
     val ballotOpt: Option[Ballot] = hint match {
       case _: BallotPrepareStatement     => None
       case x: BallotConfirmStatement     => Some(Ballot(x.nH, x.ballot.get.value))
       case x: BallotExternalizeStatement => Some(Ballot(x.nH, x.commit.value))
     }
-    val cond3 = ballotOpt.isEmpty
-    val cond4 = !ballotOpt.get.compatible(slot.ballotTracker.commit.get)
+    lazy val cond3 = ballotOpt.isEmpty
+    lazy val cond4 = !ballotOpt.get.compatible(slot.ballotTracker.commit.get)
 
     if (cond1 || cond2 || cond3 || cond4) slot.pureSP[F]
     else {
