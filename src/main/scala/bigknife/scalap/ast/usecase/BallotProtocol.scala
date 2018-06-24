@@ -365,7 +365,7 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
       case _ => true
     }
 
-    val boundaries = getCommitBoundariesFromStatements(slot, ballotOpt.get)
+    lazy val boundaries = getCommitBoundariesFromStatements(slot, ballotOpt.get)
     lazy val cond4      = boundaries.isEmpty
 
     def votedPredict(interval: Interval): Message.Statement.Predict = Message.Statement.predict {

@@ -34,8 +34,9 @@ class QuorumSetServiceHandler extends QuorumSetService.Handler[Stack] {
                 if (nodes.contains(nodeId)) (nodes, true) else (nodes :+ nodeId, false)
               }
           }
-          if (check._2) {
-            val innerSetResult = quorumSet.innerSets.foldLeft((nodesCount, true)) {
+          // if not present, go on the inners
+          if (!check._2) {
+            val innerSetResult = quorumSet.innerSets.foldLeft((nodesCount + quorumSet.validators.length, true)) {
               case ((c, sane), qs) =>
                 if (sane) {
                   val res = checkSanity(qs,

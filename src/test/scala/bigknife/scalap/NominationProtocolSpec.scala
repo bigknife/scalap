@@ -81,7 +81,9 @@ class NominationProtocolSpec extends FunSuite {
     } yield x.get
 
     val slot = runner.runIO(p, setting1).unsafeRunSync()
-    info(s"slot: $slot")
+    info(s"slot ballot phrase: ${slot.ballotTracker.phase}")
+
+    info(s"slot: ${slot.nominateTracker.latestCompositeCandidate}")
 
   }
 }

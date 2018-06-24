@@ -245,7 +245,10 @@ class SlotServiceHandler extends SlotService.Handler[Stack] {
     val bt2 = s2.ballotTracker
     bt1.prepared != bt2.prepared ||
     bt1.preparedPrime != bt2.preparedPrime ||
-    bt1.commit != bt2.commit
+    bt1.commit != bt2.commit ||
+    bt1.currentBallot != bt2.currentBallot ||
+    bt1.highBallot != bt2.highBallot ||
+    bt1.phase != bt2.phase
   }
 
   override def setHeardFromQuorum(slot: Slot, heard: Boolean): Stack[Slot] = Stack {
