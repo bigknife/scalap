@@ -61,14 +61,25 @@ class NominationProtocolSpec extends FunSuite {
     val nomV3 =
       Message.Nominate(node3, slotIndex, Vector(value), Vector(value), hashOfQuorumSet(qs3, setting1))
 
+    val prepare = Message.Prepare(
+      node2, slotIndex, hashOfQuorumSet(qs2, setting1),
+      Some(Ballot(1, TestValue("\nhello,world"))),
+      None,
+      None,
+      0,
+      0
+    )
+
     val msg1 = Message(nomV2, Signature.Empty)
     val msg2 = Message(nomV3, Signature.Empty)
+    val msg3 = Message(prepare, Signature.Empty)
 
     val scpTest = SCPTest[component.Model.Op]
 
     val p1 = scpTest.handleMessage(setting1.nodeId, msg1)
     val p2 = scpTest.handleMessage(setting1.nodeId, msg2)
     val p3 = scpTest.getSlot(setting1.nodeId, slotIndex)
+    val p4 = scpTest.handleMessage(setting1.nodeId, msg3)
 
     val p = for {
       _ <- scpTest.saveQuorumSet(qs1)
@@ -77,13 +88,13 @@ class NominationProtocolSpec extends FunSuite {
       _ <- scpTest.saveQuorumSet(qs4)
       _ <- p1
       _ <- p2
+      r <- p4
       x <- p3
-    } yield x.get
+    } yield (x.get,r)
 
-    val slot = runner.runIO(p, setting1).unsafeRunSync()
+    val (slot, r) = runner.runIO(p, setting1).unsafeRunSync()
     info(s"slot ballot phrase: ${slot.ballotTracker.phase}")
-
+    info(s"slot: $r")
     info(s"slot: ${slot.nominateTracker.latestCompositeCandidate}")
-
   }
 }

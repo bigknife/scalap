@@ -473,7 +473,7 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
               msg.statement match {
                 case x: BallotPrepareStatement     => acc + x.ballot.get.counter
                 case x: BallotConfirmStatement     => acc + x.ballot.get.counter
-                case x: BallotExternalizeStatement => acc + Int.MaxValue
+                case _: BallotExternalizeStatement => acc + Int.MaxValue
               }
           }
           .toVector
