@@ -23,6 +23,7 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
     def advanceSlot(slot: Slot, statement: BallotStatement): SP[F, Result] = {
       for {
         xSlotAdvanced <- slotService.tryAdvanceSlotBallotMessageLevel(slot)
+        _ <- logService.info(s"advanceSlot, currentMessageLevel = ${slot.ballotTracker.currentMessageLevel}")
         r <- if (!xSlotAdvanced._2) for {
           _  <- logService.info("maximum number of transitions reached in advanceSlot")
           r0 <- validResult(slot)
@@ -49,7 +50,7 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
         case Phase.Externalized =>
           for {
             workingBallot <- messageService.getWorkingBallot(message.statement)
-            res <- if (slot.ballotTracker.commit.isDefined && slot.ballotTracker.commit.get.value == workingBallot.value)
+            res <- if (slot.ballotTracker.commit.value == workingBallot.value)
               for {
                 s0 <- slotService.tractNewBallotMessage(slot, message)
                 r  <- validResult(s0)
@@ -100,14 +101,17 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
     * @return
     */
   final def bumpState(slot: Slot, candidate: Value, force: Boolean): SP[F, Slot] = {
-    if (!force && slot.ballotTracker.currentBallot.isDefined) slot.pureSP[F]
+    val c = slot.ballotTracker.currentBallot
+    if (!force && c != Ballot.NullBallot) slot.pureSP[F]
     else {
-      val n = slot.ballotTracker.currentBallot.map(_.counter + 1).getOrElse(1)
+      val n = if (c == Ballot.NullBallot) 1 else c.counter + 1
       bumpState(slot, candidate, n)
     }
   }
 
   final def bumpState(slot: Slot, candidate: Value, n: Int): SP[F, Slot] = {
+    val h = slot.ballotTracker.highBallot
+
     def updateCurrentValue(slot: Slot, ballot: Ballot): SP[F, Slot] = {
       slot.ballotTracker.phase match {
         case Phase.Externalized => slot.pureSP[F]
@@ -115,9 +119,8 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
           val current = slot.ballotTracker.currentBallot
           val commit  = slot.ballotTracker.commit
           // conditions to bumpToBallot
-          val cond1 = current.isEmpty
-          lazy val cond2 = (current.get < ballot) && !(commit.isDefined && !commit.get.compatible(
-            ballot))
+          val cond1 = current <= ballot && commit.incompatible(ballot)
+          val cond2 = current < ballot
 
           for {
             xSlot <- if (cond1 || cond2) bumpToBallot(slot, ballot, check = true)
@@ -130,14 +133,15 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
     slot.ballotTracker.phase match {
       case Phase.Externalized => slot.pureSP[F]
       case _ =>
-        val newB = Ballot(n, slot.ballotTracker.highBallot.map(_.value).getOrElse(candidate))
+        val newB = Ballot(n, if (h != Ballot.NullBallot) h.value else candidate)
         for {
+          _        <- logService.info(s"bumpState for Slot[${slot.index}] with value: ${newB.value}")
           xSlot    <- updateCurrentValue(slot, newB)
           modified <- slotService.hasAdvancedBallotProcess(slot, xSlot)
           ySlot <- if (modified) for {
-            _  <- emitCurrentStatement(xSlot)
-            s0 <- checkHeardFromQuorum(xSlot)
-          } yield s0
+            s0  <- emitCurrentStatement(xSlot)
+            s1 <- checkHeardFromQuorum(s0)
+          } yield s1
           else xSlot.pureSP[F]
         } yield ySlot
     }
@@ -170,12 +174,12 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
 
   private def validateValues(slot: Slot,
                              statement: BallotStatement): SP[F, (Value.Validity, Slot)] = {
+
     val values: Vector[Value] = statement match {
       case x: BallotPrepareStatement =>
-        val ballotValue: Option[Value] =
-          x.ballot.flatMap(x => if (x.counter != 0) Some(x.value) else None)
-        val preparedValue: Option[Value] = x.prepared.map(_.value)
-        ballotValue.toVector ++ preparedValue.toVector
+        val ballots  = if (x.ballot.counter != 0) Vector(x.ballot.value) else Vector()
+        val prepares = if (x.prepared.counter != 0) Vector(x.prepared.value) else Vector()
+        ballots ++ prepares
       case x: BallotConfirmStatement =>
         x.ballot.map(_.value).toVector
       case x: BallotExternalizeStatement =>
@@ -208,8 +212,8 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
             slotService.setPreparedBallot(slot, acceptedOpt.get): SP[F, Slot]
           else slot.pureSP[F]
           advanced <- slotService.hasAdvancedBallotProcess(slot, xSlot)
-          _        <- if (advanced) emitCurrentStatement(xSlot) else ().pureSP[F]
-        } yield xSlot
+          ySlot        <- if (advanced) emitCurrentStatement(xSlot) else xSlot.pureSP[F]
+        } yield ySlot
 
     }
   }
@@ -221,23 +225,22 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
       // only consider the ballot if it may help us increase
       // p (note: at this point, p ~ c)
       val cond1 = slot.ballotTracker.phase == Phase.Confirm && {
-        (!(slot.ballotTracker.prepared.isDefined &&
-          slot.ballotTracker.prepared.get <= n && slot.ballotTracker.prepared.get
-          .compatible(n))) || { require(slot.ballotTracker.commit.get.compatible(n)); false }
+        (!(slot.ballotTracker.prepared <= n && slot.ballotTracker.prepared.compatible(n))) || {
+          require(slot.ballotTracker.commit.compatible(n)); false
+        }
       }
 
       // if we already prepared this ballot, don't bother checking again
 
       // if ballot <= p' ballot is neither a candidate for p nor p'
-      lazy val cond2 = slot.ballotTracker.preparedPrime.isDefined && (n <= slot.ballotTracker.preparedPrime.get)
+      lazy val cond2 = n <= slot.ballotTracker.preparedPrime
 
       // if ballot is already covered by p, skip
-      lazy val cond3 = slot.ballotTracker.prepared.isDefined && (n <= slot.ballotTracker.prepared.get && n
-        .compatible(slot.ballotTracker.prepared.get))
+      lazy val cond3 = (n <= slot.ballotTracker.prepared) && n.compatible(slot.ballotTracker.prepared)
 
       // predict
       val votedPredict: Message.Statement.Predict = Message.Statement.predict {
-        case x: Message.Prepare     => n <= x.ballot.get && n.compatible(x.ballot.get)
+        case x: Message.Prepare     => n <= x.ballot && n.compatible(x.ballot)
         case x: Message.Confirm     => n.compatible(x.ballot.get)
         case x: Message.Externalize => n.compatible(x.commit)
         case _                      => false // impossible
@@ -272,7 +275,7 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
             next <- if (pre._2) acc
             else {
               val highBallot = slot.ballotTracker.highBallot
-              if (highBallot.isDefined && highBallot.get >= n) {
+              if (highBallot >= n) {
                 (pre._1, true).pureSP[F]
               } else {
                 for {
@@ -292,9 +295,9 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
       val prepared      = slot.ballotTracker.prepared
       val preparedPrime = slot.ballotTracker.preparedPrime
       val current       = slot.ballotTracker.currentBallot
-      if (commit.isEmpty &&
-          (prepared.isEmpty || !(rstart <= prepared.get && rstart.compatible(prepared.get))) &&
-          (preparedPrime.isEmpty || !(rstart <= prepared.get && rstart.compatible(prepared.get)))) {
+      if (commit == Ballot.NullBallot &&
+          (!(rstart <= prepared && rstart.compatible(prepared))) &&
+          (!(rstart <= prepared && rstart.compatible(prepared)))) {
         val sorted = ballots.sorted
         val rest   = sorted.dropRight(sorted.length - sorted.indexOf(rstart) - 1)
 
@@ -305,7 +308,7 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
               pre <- acc
               res <- if (pre._2) acc
               else {
-                if (current.isDefined && n < current.get) (pre._1, true).pureSP[F]
+                if (n < current) (pre._1, true).pureSP[F]
                 else {
                   for {
                     ratified <- federatedRatify(slot,
@@ -321,7 +324,7 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
 
     }
 
-    if (slot.ballotTracker.phase != Phase.Prepare || slot.ballotTracker.prepared.isEmpty)
+    if (slot.ballotTracker.phase != Phase.Prepare || slot.ballotTracker.prepared == Ballot.NullBallot)
       slot.pureSP[F]
     else {
       val candidatesSP: SP[F, Vector[Ballot]] = messageService.getPreparedCandidates(slot, hint)
@@ -335,8 +338,8 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
             advanced <- slotService.hasAdvancedBallotProcess(slot, s0)
             s1 <- if (advanced) for {
               x <- updateCurrentIfNeeded(s0)
-              _ <- emitCurrentStatement(x)
-            } yield x
+              y <- emitCurrentStatement(x)
+            } yield y
             else s0.pureSP[F]
           } yield s1
         } else slot.pureSP[F]
@@ -353,15 +356,16 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
     // possible value to commit
     val ballotOpt: Option[Ballot] = hint match {
       case x: BallotPrepareStatement =>
-        if (x.nC != 0) Some(Ballot(x.nH, x.ballot.get.value)) else Option.empty[Ballot]
+        if (x.nC != 0) Some(Ballot(x.nH, x.ballot.value)) else Option.empty[Ballot]
       case x: BallotConfirmStatement     => Some(Ballot(x.nH, x.ballot.get.value))
       case x: BallotExternalizeStatement => Some(Ballot(x.nH, x.commit.value))
     }
     lazy val cond2 = ballotOpt.isEmpty
 
     lazy val cond3 = slot.ballotTracker.phase match {
-      case Phase.Confirm if ballotOpt.isDefined && slot.ballotTracker.highBallot.isDefined =>
-        !ballotOpt.get.compatible(slot.ballotTracker.highBallot.get)
+      case Phase.Confirm
+          if ballotOpt.isDefined && slot.ballotTracker.highBallot != Ballot.NullBallot =>
+        !ballotOpt.get.compatible(slot.ballotTracker.highBallot)
       case _ => true
     }
 
@@ -370,7 +374,7 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
 
     def votedPredict(interval: Interval): Message.Statement.Predict = Message.Statement.predict {
       case x: BallotPrepareStatement =>
-        if (x.ballot.get.compatible(ballotOpt.get) && x.nC != 0)
+        if (x.ballot.compatible(ballotOpt.get) && x.nC != 0)
           x.nC <= interval.first && interval.second <= x.nH
         else false
       case x: BallotConfirmStatement =>
@@ -401,8 +405,8 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
           val h = Ballot(candidate.second, ballotOpt.get.value)
           for {
             _ <- if (slot.ballotTracker.phase == Phase.Prepare &&
-                     (slot.ballotTracker.currentBallot.isDefined && !(h < slot.ballotTracker.currentBallot.get && h
-                       .compatible(slot.ballotTracker.currentBallot.get)))) {
+                     (slot.ballotTracker.currentBallot != Ballot.NullBallot && !(h < slot.ballotTracker.currentBallot && h
+                       .compatible(slot.ballotTracker.currentBallot)))) {
               bumpToBallot(slot, h, check = false)
             } else ().pureSP[F]
             s0 <- slotService.setAcceptCommit(slot, c, h): SP[F, Slot]
@@ -412,22 +416,22 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
         modified <- slotService.hasAdvancedBallotProcess(slot, xSlot)
         ySlot <- if (modified) for {
           s0 <- updateCurrentIfNeeded(xSlot)
-          _  <- emitCurrentStatement(s0)
-        } yield s0
+          s1  <- emitCurrentStatement(s0)
+        } yield s1
         else xSlot.pureSP[F]
       } yield ySlot
   }
 
   private def attemptConfirmCommit(slot: Slot, hint: BallotStatement): SP[F, Slot] = {
-    val cond1 = slot.ballotTracker.phase != Phase.Confirm
-    lazy val cond2 = slot.ballotTracker.highBallot.isEmpty || slot.ballotTracker.commit.isEmpty
+    val cond1      = slot.ballotTracker.phase != Phase.Confirm
+    lazy val cond2 = slot.ballotTracker.highBallot == Ballot.NullBallot || slot.ballotTracker.commit == Ballot.NullBallot
     val ballotOpt: Option[Ballot] = hint match {
       case _: BallotPrepareStatement     => None
       case x: BallotConfirmStatement     => Some(Ballot(x.nH, x.ballot.get.value))
       case x: BallotExternalizeStatement => Some(Ballot(x.nH, x.commit.value))
     }
     lazy val cond3 = ballotOpt.isEmpty
-    lazy val cond4 = !ballotOpt.get.compatible(slot.ballotTracker.commit.get)
+    lazy val cond4 = !ballotOpt.get.compatible(slot.ballotTracker.commit)
 
     if (cond1 || cond2 || cond3 || cond4) slot.pureSP[F]
     else {
@@ -462,16 +466,16 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
     slot.ballotTracker.phase match {
       case Phase.Externalized => slot.pureSP[F]
       case _ =>
-        val currentBallotOpt = slot.ballotTracker.currentBallot
-        val latestMsgs       = slot.ballotTracker.latestBallotMessages
+        val currentBallot = slot.ballotTracker.currentBallot
+        val latestMsgs    = slot.ballotTracker.latestBallotMessages
 
-        val targetCounter = currentBallotOpt.map(_.counter).getOrElse(0)
+        val targetCounter = currentBallot.counter
 
         val allCounters = latestMsgs
           .foldLeft(Set(targetCounter)) {
             case (acc, (_, msg)) =>
               msg.statement match {
-                case x: BallotPrepareStatement     => acc + x.ballot.get.counter
+                case x: BallotPrepareStatement     => acc + x.ballot.counter
                 case x: BallotConfirmStatement     => acc + x.ballot.get.counter
                 case _: BallotExternalizeStatement => acc + Int.MaxValue
               }
@@ -486,7 +490,7 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
               case (_, msg) =>
                 msg.statement match {
                   case x: BallotPrepareStatement =>
-                    n < x.ballot.get.counter
+                    n < x.ballot.counter
                   case x: BallotConfirmStatement =>
                     n < x.ballot.get.counter
                   case _ => n != Int.MaxValue
@@ -525,11 +529,11 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
   }
   private def abandonBallot(slot: Slot, n: Int): SP[F, Slot] = {
     val v = slot.nominateTracker.latestCompositeCandidate
-      .orElse(slot.ballotTracker.currentBallot.map(_.value))
-    if (v.isEmpty) slot.pureSP[F]
+      .getOrElse(slot.ballotTracker.currentBallot.value)
+    if (v == Ballot.NullBallot) slot.pureSP[F]
     else {
-      if (n == 0) bumpState(slot, v.get, force = true)
-      else bumpState(slot, v.get, n)
+      if (n == 0) bumpState(slot, v, force = true)
+      else bumpState(slot, v, n)
     }
   }
 
@@ -537,13 +541,10 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
     val current = slot.ballotTracker.currentBallot
     val filter: Message.Statement => Boolean = {
       case x: BallotPrepareStatement =>
-        (for {
-          x1 <- slot.ballotTracker.currentBallot
-          x2 <- x.ballot
-        } yield x1 <= x2).getOrElse(false)
+        slot.ballotTracker.currentBallot <= x.ballot
       case _ => true
     }
-    if (current.isDefined) {
+    if (current != Ballot.NullBallot) {
       for {
         qs <- quorumSetService.quorumFunction(slot.nodeId)
         isQ <- {
@@ -582,7 +583,7 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
             case _ =>
               val heardEver = slot.ballotTracker.heardFromQuorum
               for {
-                _ <- applicationExtension.ballotDidHearFromQuorum(slot, current.get)
+                _ <- applicationExtension.ballotDidHearFromQuorum(slot, current)
                 s0 <- if (heardEver) slot.pureSP[F]
                 else
                   for {
@@ -598,6 +599,7 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
   }
   private def sendLatestEnvelope(slot: Slot): SP[F, Slot] = {
     if (slot.ballotTracker.currentMessageLevel == 0 && slot.ballotTracker.lastMessage.isDefined && slot.fullValidated) {
+      //println(slot.ballotTracker.currentMessageLevel)
       if (slot.ballotTracker.lastEmittedMessage.isEmpty || !slot.ballotTracker.lastMessage.contains(
             slot.ballotTracker.lastEmittedMessage.get)) {
         for {
@@ -611,7 +613,7 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
     val lastMsg = slot.ballotTracker.latestBallotMessages.get(slot.nodeId)
     def shouldSend(msg: BallotMessage): SP[F, Boolean] =
       for {
-        cond1 <- slot.ballotTracker.currentBallot.isDefined.pureSP[F]
+        cond1 <- (slot.ballotTracker.currentBallot != Ballot.NullBallot).pureSP[F]
         cond2 <- if (slot.ballotTracker.lastMessage.isDefined)
           messageService.firstBallotStatementIsNewer(
             msg.statement,
@@ -651,29 +653,27 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
     def areBallotsLessAndIncompatible(b1: Ballot, b2: Ballot): Boolean =
       b1 <= b2 && !b1.compatible(b2)
     for {
-      _ <- if (phase == Phase.Confirm && commit.isEmpty)
+      _ <- if (phase == Phase.Confirm && commit.isZero)
         logService.error("when Phase.Confirm, commit should not be empty"): SP[F, Unit]
       else ().pureSP[F]
-      _ <- if (phase == Phase.Externalized && (commit.isEmpty || high.isEmpty))
+      _ <- if (phase == Phase.Externalized && (commit.isZero || high.isZero))
         logService.error("when Phase.Confirm, commit and high should not be empty"): SP[F, Unit]
       else ().pureSP[F]
-      _ <- if (current.isDefined && current.get.counter <= 0)
+      _ <- if (current.counter <= 0)
         logService.error("current ballot's counter should <= 0"): SP[F, Unit]
       else ().pureSP[F]
-      _ <- if (prepare.isDefined && preparePrime.isDefined && !areBallotsLessAndIncompatible(
-                 preparePrime.get,
-                 prepare.get))
+      _ <- if (prepare.isNotZero && preparePrime.isNotZero && !areBallotsLessAndIncompatible(preparePrime, prepare))
         logService.error("preparePrime should less than and incompatible to prepare"): SP[F, Unit]
       else ().pureSP[F]
-      _ <- if (commit.isDefined && current.isEmpty)
+      _ <- if (commit.isNotZero && current.isZero)
         logService.error("when commit is defined, current ballot should be empty"): SP[F, Unit]
       else ().pureSP[F]
-      _ <- if (commit.isDefined && !areBallotsLessAndIncompatible(commit.get, high.get))
+      _ <- if (commit.isNotZero && !areBallotsLessAndIncompatible(commit, high))
         logService.error("when commit is defined, commit should less than and incompatible to high"): SP[
           F,
           Unit]
       else ().pureSP[F]
-      _ <- if (commit.isDefined && !areBallotsLessAndIncompatible(high.get, current.get))
+      _ <- if (commit.isNotZero && !areBallotsLessAndIncompatible(high, current))
         logService.error(
           "when commit is defined, high should less than and incompatible to current"): SP[F, Unit]
       else ().pureSP[F]
@@ -682,7 +682,7 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
   }
 
   private def bumpToBallot(slot: Slot, ballot: Ballot, check: Boolean): SP[F, Slot] = {
-    val gotBumped = slot.ballotTracker.currentBallot.isEmpty || slot.ballotTracker.currentBallot.get.counter != ballot.counter
+    val gotBumped = slot.ballotTracker.currentBallot.isZero || slot.ballotTracker.currentBallot.counter != ballot.counter
     for {
       _ <- logService.info(s"slot(${slot.index}) bumpToBallot ($ballot)")
       xSlot <- if (slot.ballotTracker.phase == Phase.Externalized) for {
@@ -695,9 +695,9 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
 
   private def acceptedPredict(n: Ballot): Message.Statement.Predict = Message.Statement.predict {
     case x: Message.Prepare =>
-      (x.prepared.isDefined && (n <= x.prepared.get && n.compatible(x.prepared.get))) ||
-        (x.preparedPrime.isDefined && (n <= x.preparedPrime.get && n.compatible(
-          x.preparedPrime.get)))
+      (x.prepared != Ballot.NullBallot && (n <= x.prepared && n.compatible(x.prepared))) ||
+        (x.preparedPrime != Ballot.NullBallot && (n <= x.preparedPrime && n.compatible(
+          x.preparedPrime)))
 
     case x: Message.Confirm =>
       val p = Ballot(x.nPrepared, x.ballot.get.value)
@@ -714,7 +714,7 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
       case (acc, (_, msg)) =>
         msg.statement match {
           case x: BallotPrepareStatement =>
-            if (ballot.compatible(x.ballot.get) && x.nC > 0) {
+            if (ballot.compatible(x.ballot) && x.nC > 0) {
               val xs = (if (!acc.contains(x.nC)) Vector(x.nC) else Vector()) ++
                 (if (!acc.contains(x.nH)) Vector(x.nH) else Vector())
               acc ++ xs
@@ -772,8 +772,8 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
   private def updateCurrentIfNeeded(slot: Slot): SP[F, Slot] = {
     val current = slot.ballotTracker.currentBallot
     val high    = slot.ballotTracker.highBallot
-    if (current.isEmpty || current.get < high.get) {
-      bumpToBallot(slot, high.get, check = true)
+    if (current.isZero || current < high) {
+      bumpToBallot(slot, high, check = true)
     } else slot.pureSP[F]
   }
 }

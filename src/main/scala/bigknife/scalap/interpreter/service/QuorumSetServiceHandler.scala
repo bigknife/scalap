@@ -117,6 +117,13 @@ class QuorumSetServiceHandler extends QuorumSetService.Handler[Stack] {
     }
     Hash(misc.crypto.sha3(_inner(quorumSet).toArray))
   }
+
+  override def buildSingletonQuorumSet(nodeId: ID): Stack[QuorumSet] = Stack {
+    QuorumSet(
+      threshold = 1,
+      validators = Vector(nodeId)
+    )
+  }
 }
 
 object QuorumSetServiceHandler {

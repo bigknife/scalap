@@ -43,9 +43,9 @@ object Message {
       nodeId: Node.ID, // v
       slotIndex: Long, // i
       quorumSetHash: Hash, // D
-      ballot: Option[Ballot], // b
-      prepared: Option[Ballot], // p
-      preparedPrime: Option[Ballot], // p'
+      ballot: Ballot, // b
+      prepared: Ballot, // p
+      preparedPrime: Ballot, // p'
       nC: Int, // c.n
       nH: Int // h.n
   ) extends BallotStatement {

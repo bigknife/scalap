@@ -4,7 +4,6 @@ case class Ballot(
     counter: Int,
     value: Value
 ) extends Ordered[Ballot] {
-
   override def compare(that: Ballot): Int = {
     val c = this.counter - that.counter
     if (c != 0) c
@@ -26,4 +25,10 @@ case class Ballot(
   def lessThanAndIncompatible(that: Ballot): Boolean = lessThan(that) && incompatible(that)
   def lessThanAndCompatible(that: Ballot): Boolean   = lessThan(that) && compatible(that)
 
+  def isZero: Boolean = this == Ballot.NullBallot
+  def isNotZero: Boolean = this != Ballot.NullBallot
+}
+
+object Ballot {
+  val NullBallot: Ballot = Ballot(0, Value.Bottom)
 }

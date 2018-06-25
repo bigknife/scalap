@@ -113,22 +113,15 @@ class MessageServiceHandler extends MessageService.Handler[Stack] {
       statement match {
         case x: Message.Prepare =>
           // b =/ 0
-          val bGt0 = self || x.ballot.exists(_.counter > 0)
+          val bGt0 = x.ballot != Ballot.NullBallot
 
           // p and p' should be incompatible, and p' < p
-          val pPOpt: Option[Boolean] = for {
-            p      <- x.prepared
-            pPrime <- x.preparedPrime
-            li     <- Some(pPrime.lessThanAndIncompatible(p))
-          } yield li
-          val pp = pPOpt.getOrElse(true)
+          val pp = (x.preparedPrime.isZero || x.prepared.isZero) || x.preparedPrime <= x.prepared && x.preparedPrime.incompatible(x.prepared)
 
-          val h = x.nH == 0 || x.prepared.exists(_.counter >= x.nH)
+          val h = x.nH == 0 || x.prepared.counter >= x.nH
 
           // c != 0 -> c <= h <= b
-          val c = x.nC == 0 || (x.nH != 0 && x.ballot
-            .map(_.counter)
-            .getOrElse(0) >= x.nH && x.nH >= x.nC)
+          val c = x.nC == 0 || (x.nH != 0 && x.ballot.counter >= x.nH && x.nH >= x.nC)
 
           bGt0 && pp && h && c
 
@@ -144,7 +137,7 @@ class MessageServiceHandler extends MessageService.Handler[Stack] {
 
   override def getWorkingBallot(st: BallotStatement): Stack[Ballot] = Stack {
     st match {
-      case x: BallotPrepareStatement     => x.ballot.get
+      case x: BallotPrepareStatement     => x.ballot
       case x: BallotConfirmStatement     => Ballot(x.nCommit, x.ballot.get.value)
       case x: BallotExternalizeStatement => x.commit
     }
@@ -154,7 +147,10 @@ class MessageServiceHandler extends MessageService.Handler[Stack] {
     Stack {
       val hintBallots = st match {
         case x: BallotPrepareStatement =>
-          x.prepared.toVector ++ x.preparedPrime.toVector
+          (if (x.ballot.isNotZero) Vector(x.ballot) else Vector()) ++
+            (if (x.prepared.isNotZero) Vector(x.prepared) else Vector()) ++
+            (if (x.preparedPrime.isNotZero) Vector(x.preparedPrime) else Vector())
+          //Vector(x.ballot, x.prepared, x.preparedPrime)
         case x: BallotConfirmStatement =>
           Vector(Ballot(x.nPrepared, x.ballot.get.value), Ballot(Int.MaxValue, x.ballot.get.value))
         case x: BallotExternalizeStatement =>
@@ -169,13 +165,14 @@ class MessageServiceHandler extends MessageService.Handler[Stack] {
               case x: BallotPrepareStatement =>
                 val lb: scala.collection.mutable.ListBuffer[Ballot] =
                   scala.collection.mutable.ListBuffer.empty
-                if (areBallotsLessAndCompatible(x.ballot.get, n)) lb.append(x.ballot.get) else ()
-                if (x.prepared.isDefined && areBallotsLessAndCompatible(x.prepared.get, n))
-                  lb.append(x.prepared.get)
+                if (areBallotsLessAndCompatible(x.ballot, n)) lb.append(x.ballot) else ()
+                if (x.prepared != Ballot.NullBallot && areBallotsLessAndCompatible(x.prepared, n))
+                  lb.append(x.prepared)
                 else ()
-                if (x.preparedPrime.isDefined && areBallotsLessAndCompatible(x.preparedPrime.get,
-                                                                             n))
-                  lb.append(x.preparedPrime.get)
+                if (x.preparedPrime != Ballot.NullBallot && areBallotsLessAndCompatible(
+                      x.preparedPrime,
+                      n))
+                  lb.append(x.preparedPrime)
                 else ()
                 _acc ++ lb.toVector
 
@@ -208,8 +205,8 @@ class MessageServiceHandler extends MessageService.Handler[Stack] {
             slot.ballotTracker.currentBallot,
             slot.ballotTracker.prepared,
             slot.ballotTracker.preparedPrime,
-            slot.ballotTracker.commit.map(_.counter).getOrElse(0),
-            slot.ballotTracker.highBallot.map(_.counter).getOrElse(0)
+            slot.ballotTracker.commit.counter,
+            slot.ballotTracker.highBallot.counter
           ),
           Signature.Empty
         )
@@ -219,10 +216,10 @@ class MessageServiceHandler extends MessageService.Handler[Stack] {
             slot.nodeId,
             slot.index,
             quorumSetHash,
-            slot.ballotTracker.currentBallot,
-            slot.ballotTracker.prepared.map(_.counter).getOrElse(0),
-            slot.ballotTracker.commit.map(_.counter).getOrElse(0),
-            slot.ballotTracker.highBallot.map(_.counter).getOrElse(0)
+            Some(slot.ballotTracker.currentBallot),
+            slot.ballotTracker.prepared.counter,
+            slot.ballotTracker.commit.counter,
+            slot.ballotTracker.highBallot.counter
           ),
           Signature.Empty
         )
@@ -231,8 +228,8 @@ class MessageServiceHandler extends MessageService.Handler[Stack] {
           Message.Externalize(slot.nodeId,
                               slot.index,
                               quorumSetHash,
-                              slot.ballotTracker.commit.get,
-                              slot.ballotTracker.highBallot.map(_.counter).getOrElse(0)),
+                              slot.ballotTracker.commit,
+                              slot.ballotTracker.highBallot.counter),
           Signature.Empty
         )
 
@@ -262,6 +259,15 @@ class MessageServiceHandler extends MessageService.Handler[Stack] {
       else if (s1.value < s2.value) -1
       else 0
     }
+  }
+
+  private def compareBallotOpt(s1: Ballot, s2: Ballot): Int = {
+    if (s1.counter > s2.counter) 1
+    else if (s1.counter < s2.counter) -1
+    else if (s1.value > s2.value) 1
+    else if (s1.value < s2.value) -1
+    else 0
+
   }
 }
 

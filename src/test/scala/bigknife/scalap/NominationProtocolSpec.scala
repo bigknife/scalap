@@ -61,18 +61,38 @@ class NominationProtocolSpec extends FunSuite {
     val nomV3 =
       Message.Nominate(node3, slotIndex, Vector(value), Vector(value), hashOfQuorumSet(qs3, setting1))
 
-    val prepare = Message.Prepare(
+    val prepare1 = Message.Prepare(
       node2, slotIndex, hashOfQuorumSet(qs2, setting1),
-      Some(Ballot(1, TestValue("\nhello,world"))),
-      None,
-      None,
+      Ballot(1, TestValue("\nhello,world")),
+      Ballot.NullBallot,
+      Ballot.NullBallot,
+      0,
+      0
+    )
+
+    val prepare2 = Message.Prepare(
+      node3, slotIndex, hashOfQuorumSet(qs3, setting1),
+      Ballot(1, TestValue("\nhello,world")),
+      Ballot.NullBallot,
+      Ballot.NullBallot,
+      0,
+      0
+    )
+
+    val prepare3 = Message.Prepare(
+      node4, slotIndex, hashOfQuorumSet(qs4, setting1),
+      Ballot(1, TestValue("\nhello,world")),
+      Ballot.NullBallot,
+      Ballot.NullBallot,
       0,
       0
     )
 
     val msg1 = Message(nomV2, Signature.Empty)
     val msg2 = Message(nomV3, Signature.Empty)
-    val msg3 = Message(prepare, Signature.Empty)
+    val msg3 = Message(prepare1, Signature.Empty)
+    val msg4 = Message(prepare2, Signature.Empty)
+    val msg5 = Message(prepare3, Signature.Empty)
 
     val scpTest = SCPTest[component.Model.Op]
 
@@ -80,6 +100,8 @@ class NominationProtocolSpec extends FunSuite {
     val p2 = scpTest.handleMessage(setting1.nodeId, msg2)
     val p3 = scpTest.getSlot(setting1.nodeId, slotIndex)
     val p4 = scpTest.handleMessage(setting1.nodeId, msg3)
+    val p5 = scpTest.handleMessage(setting1.nodeId, msg4)
+    val p6 = scpTest.handleMessage(setting1.nodeId, msg5)
 
     val p = for {
       _ <- scpTest.saveQuorumSet(qs1)
@@ -88,13 +110,18 @@ class NominationProtocolSpec extends FunSuite {
       _ <- scpTest.saveQuorumSet(qs4)
       _ <- p1
       _ <- p2
-      r <- p4
-      x <- p3
-    } yield (x.get,r)
+      _ <- p4
+      x0 <- p3
+      _ <- p5
+      x1 <- p3
+      _ <- p6
+      x2 <- p3
+    } yield (x0.get, x1.get, x2.get)
 
-    val (slot, r) = runner.runIO(p, setting1).unsafeRunSync()
-    info(s"slot ballot phrase: ${slot.ballotTracker.phase}")
-    info(s"slot: $r")
-    info(s"slot: ${slot.nominateTracker.latestCompositeCandidate}")
+    val (s1,s2,s3) = runner.runIO(p, setting1).unsafeRunSync()
+    info(s"slot1: lastMsg = ${s1.ballotTracker.lastMessage}")
+    info(s"slot2: lastMsg = ${s2.ballotTracker.lastMessage}")
+    info(s"slot3: lastMsg = ${s3.ballotTracker.lastMessage}")
+
   }
 }

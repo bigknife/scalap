@@ -8,6 +8,12 @@ trait Value extends Ordered[Value] {
 }
 
 object Value {
+
+  val Bottom: Value = new Value {
+    override def orderFactor: Int = Int.MinValue
+    override def asBytes: Array[Byte] = Array.emptyByteArray
+  }
+
   trait Validity
   object Validity {
     case object FullyValidated extends Validity {

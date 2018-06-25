@@ -9,11 +9,11 @@ case class BallotTracker(
     phase: Phase = Phase.Prepare,
     currentMessageLevel: Int = 0,
     heardFromQuorum: Boolean = false,
-    currentBallot: Option[Ballot] = None, // b, current ballot that node v is attempting to prepare and commit
-    prepared: Option[Ballot] = None, // p
-    preparedPrime: Option[Ballot] = None, // p', p and p' is two highest ballot, and p' is less than and incompatible to p
-    highBallot: Option[Ballot] = None, // h
-    commit: Option[Ballot] = None, // c
+    currentBallot: Ballot = Ballot.NullBallot, // b, current ballot that node v is attempting to prepare and commit
+    prepared: Ballot = Ballot.NullBallot, // p
+    preparedPrime: Ballot = Ballot.NullBallot, // p', p and p' is two highest ballot, and p' is less than and incompatible to p
+    highBallot: Ballot = Ballot.NullBallot, // h
+    commit: Ballot = Ballot.NullBallot, // c
     latestBallotMessages: Map[Node.ID, BallotMessage] = Map.empty, // M
     lastMessage: Option[BallotMessage] = None,
     lastEmittedMessage: Option[BallotMessage] = None

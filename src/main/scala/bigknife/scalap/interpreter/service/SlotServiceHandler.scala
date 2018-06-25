@@ -126,36 +126,36 @@ class SlotServiceHandler extends SlotService.Handler[Stack] {
 
   override def setPreparedBallot(slot: Slot, ballot: Ballot): Stack[Slot] = Stack {
     val xSlot = slot.ballotTracker.prepared match {
-      case Some(p) =>
+      case p if p.isNotZero =>
         if (p < ballot) {
-          val npp = if (!p.compatible(ballot)) Option(p) else slot.ballotTracker.preparedPrime
-          val np  = Option(ballot)
+          val npp = if (!p.compatible(ballot)) p else slot.ballotTracker.preparedPrime
           slot.copy(
             ballotTracker = slot.ballotTracker.copy(
-              prepared = np,
+              prepared = ballot,
               preparedPrime = npp
             ))
         } else if (p > ballot) {
           // check if we should update only p'
-          if (slot.ballotTracker.preparedPrime.isEmpty || slot.ballotTracker.preparedPrime.get < ballot) {
-            slot.copy(ballotTracker = slot.ballotTracker.copy(preparedPrime = Option(ballot)))
+          if (slot.ballotTracker.preparedPrime.isZero || slot.ballotTracker.preparedPrime < ballot) {
+            slot.copy(ballotTracker = slot.ballotTracker.copy(preparedPrime = ballot))
           } else slot
         } else slot
-      case None => slot.copy(ballotTracker = slot.ballotTracker.copy(prepared = Some(ballot)))
+      case _ => slot.copy(ballotTracker = slot.ballotTracker.copy(prepared = ballot))
     }
 
     //setPreparedAccept see BallotProtocol.cpp#869
     val ySlot =
-      if (xSlot.ballotTracker.commit.isDefined && xSlot.ballotTracker.highBallot.isDefined) {
-        val c = xSlot.ballotTracker.commit.get
-        val h = xSlot.ballotTracker.highBallot.get
+      if (xSlot.ballotTracker.commit.isNotZero && xSlot.ballotTracker.highBallot.isNotZero) {
+        val c = xSlot.ballotTracker.commit
+        val h = xSlot.ballotTracker.highBallot
+        val p = xSlot.ballotTracker.prepared
+        val pp = xSlot.ballotTracker.preparedPrime
 
-        if (xSlot.ballotTracker.prepared.exists(p => h <= p && !h.compatible(p)) ||
-            xSlot.ballotTracker.preparedPrime.exists(p => h <= p && !h.compatible(p))) {
+        if (h <= p && !h.compatible(p) || (h <= pp && !h.compatible(pp))) {
           require(xSlot.ballotTracker.phase == Phase.Prepare)
           xSlot.copy(
             ballotTracker = xSlot.ballotTracker.copy(
-              commit = None
+              commit = Ballot.NullBallot
             ))
         } else xSlot
       } else xSlot
@@ -166,11 +166,8 @@ class SlotServiceHandler extends SlotService.Handler[Stack] {
   override def setPreparedConfirmed(slot: Slot,
                                     newC: Option[Ballot],
                                     newH: Option[Ballot]): Stack[Slot] = Stack {
-    val newHighBallot: Option[Ballot] =
-      slot.ballotTracker.highBallot.flatMap(p => newH.map(np => if (np > p) np else p)).orElse(newH)
-
-    val newCommit = if (newC.isDefined) newC else slot.ballotTracker.commit
-
+    val newHighBallot: Ballot = newH.find(_ > slot.ballotTracker.highBallot).getOrElse(slot.ballotTracker.highBallot)
+    val newCommit = newC.getOrElse(slot.ballotTracker.commit)
     slot.copy(
       ballotTracker = slot.ballotTracker.copy(
         highBallot = newHighBallot,
@@ -180,14 +177,14 @@ class SlotServiceHandler extends SlotService.Handler[Stack] {
   }
 
   override def setAcceptCommit(slot: Slot, commit: Ballot, high: Ballot): Stack[Slot] = Stack {
-    val highOpt   = slot.ballotTracker.highBallot
-    val commitOpt = slot.ballotTracker.commit
+    val oldHigh   = slot.ballotTracker.highBallot
+    val oldCommit = slot.ballotTracker.commit
     val s0 =
-      if (highOpt.isEmpty || commitOpt.isEmpty || highOpt.get != high || commitOpt.get != commit) {
+      if (oldHigh != high || oldCommit != commit) {
         slot.copy(
           ballotTracker = slot.ballotTracker.copy(
-            commit = Some(commit),
-            highBallot = Some(high)
+            commit = commit,
+            highBallot = high
           ))
       } else slot
 
@@ -195,7 +192,7 @@ class SlotServiceHandler extends SlotService.Handler[Stack] {
       s0.copy(
         ballotTracker = s0.ballotTracker.copy(
           phase = Phase.Confirm,
-          preparedPrime = None
+          preparedPrime = Ballot.NullBallot
         ))
     } else s0
 
@@ -205,8 +202,8 @@ class SlotServiceHandler extends SlotService.Handler[Stack] {
   override def setConfirmCommit(slot: Slot, _commit: Ballot, _high: Ballot): Stack[Slot] = Stack {
     slot.copy(
       ballotTracker = slot.ballotTracker.copy(
-        commit = Some(_commit),
-        highBallot = Some(_high),
+        commit = _commit,
+        highBallot = _high,
         phase = Phase.Externalized
       ),
       nominateTracker = slot.nominateTracker.copy(nominationStarted = false)
@@ -216,7 +213,7 @@ class SlotServiceHandler extends SlotService.Handler[Stack] {
   override def setBumpBallot(slot: Slot, ballot: Ballot, bumped: Boolean): Stack[Slot] = Stack {
     val s0 = slot.copy(
       ballotTracker = slot.ballotTracker.copy(
-        currentBallot = Some(ballot)
+        currentBallot = ballot
       ))
     if (bumped) s0.copy(ballotTracker = s0.ballotTracker.copy(heardFromQuorum = !bumped))
     else s0
@@ -264,7 +261,7 @@ class SlotServiceHandler extends SlotService.Handler[Stack] {
   override def emitBallotMessage(slot: Slot, message: BallotMessage): Stack[Slot] = Stack {
     slot.copy(
       ballotTracker = slot.ballotTracker.copy(
-        lastEmittedMessage = Some(message)
+        lastMessage = Some(message)
       )
     )
   }
