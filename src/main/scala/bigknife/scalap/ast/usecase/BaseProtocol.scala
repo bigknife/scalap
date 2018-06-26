@@ -20,30 +20,6 @@ trait BaseProtocol[F[_]] {
   import model._
 
   /**
-    * validate a nomination value's validity
-    * @param value value
-    * @return
-    */
-  def validateNominationValue(value: Value): SP[F, Value.Validity]
-
-  /**
-    * validate a ballot value's validity
-    * @param value value
-    * @return
-    */
-  def validateBallotValue(value: Value): SP[F, Value.Validity]
-
-  /**
-    * try to transforms a value to a fully validted value that the local node would agree to
-    * @param slot slot
-    * @param value value(not fully validated)
-    * @return
-    */
-  def extractValidValue(slot: Slot, value: Value): SP[F, Option[Value]]
-
-
-
-  /**
     * get quorum set from a statement
     * @param statement statement
     * @return

@@ -265,6 +265,25 @@ class SlotServiceHandler extends SlotService.Handler[Stack] {
       )
     )
   }
+
+  override def setNominatingValue(slot: Slot, values: Vector[Value], previousValue: Value): Stack[Slot] = Stack {
+    slot.copy(
+      nominateTracker = slot.nominateTracker.copy(
+        nominationStarted = true,
+        previousValue = Some(previousValue),
+        voted = slot.nominateTracker.voted ++ values,
+        roundNumber = slot.nominateTracker.roundNumber + 1
+      )
+    )
+  }
+
+  override def setNominationRoundLeaders(slot: Slot, roundLeaders: Vector[ID]): Stack[Slot] = Stack {
+    slot.copy(
+      nominateTracker = slot.nominateTracker.copy(
+        roundLeaders = roundLeaders
+      )
+    )
+  }
 }
 
 object SlotServiceHandler {

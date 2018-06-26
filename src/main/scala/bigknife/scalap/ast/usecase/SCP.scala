@@ -8,12 +8,7 @@ trait SCP[F[_]] extends BaseProtocol[F] with NominationProtocol[F] with BallotPr
 
   import model._
 
-  /**
-    * verify a message in application level.
-    * @param message message with statement and signature
-    * @return if passed true else false
-    */
-  def verifyMessage(message: StatementMessage): SP[F, Boolean]
+
 
   /**
     * handle a message for a scp node
@@ -46,7 +41,7 @@ trait SCP[F[_]] extends BaseProtocol[F] with NominationProtocol[F] with BallotPr
 
     // put together
     for {
-      passed <- verifyMessage(message)
+      passed <- applicationExtension.verifyMessage(message)
       _      <- logService.info(s"verify application message: $passed")
       state <- if (!passed) MessageState.invalid.pureSP[F]
       else

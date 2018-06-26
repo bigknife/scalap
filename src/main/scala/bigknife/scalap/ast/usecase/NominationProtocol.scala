@@ -20,7 +20,9 @@ trait NominationProtocol[F[_]] extends BaseProtocol[F] {
     * @param message nomination statement
     * @return
     */
-  def runNominationProtocol(slot: Slot, message: NominationMessage, self: Boolean = false): SP[F, Result] = {
+  def runNominationProtocol(slot: Slot,
+                            message: NominationMessage,
+                            self: Boolean = false): SP[F, Result] = {
 
     val verify: SP[F, Boolean] = for {
       x <- isSane(message.statement)
@@ -53,14 +55,14 @@ trait NominationProtocol[F[_]] extends BaseProtocol[F] {
               ySlot <- if (!accepted) acc
               else
                 for {
-                  validity <- validateNominationValue(value = n)
+                  validity <- applicationExtension.validateNominationValue(n)
                   x0 <- {
                     validity match {
                       case Validity.FullyValidated =>
                         slotService.acceptNomination(xSlot, n): SP[F, Slot]
                       case _ => // try to transform value to value to vote
                         for {
-                          transformed <- extractValidValue(xSlot, n)
+                          transformed <- applicationExtension.extractValidValue(xSlot, n)
                           s0 <- if (transformed.isDefined)
                             slotService.voteNomination(xSlot, n): SP[F, Slot]
                           else acc
@@ -103,13 +105,13 @@ trait NominationProtocol[F[_]] extends BaseProtocol[F] {
               (acc, n) =>
                 for {
                   pre      <- acc
-                  validity <- validateNominationValue(n)
+                  validity <- applicationExtension.validateNominationValue(n)
                   valueToNominate <- {
                     validity match {
                       case Validity.FullyValidated => Option(n).pureSP[F]
                       case _ =>
                         for {
-                          vOpt <- extractValidValue(slot, n)
+                          vOpt <- applicationExtension.extractValidValue(slot, n): SP[F, Option[Value]]
                         } yield vOpt
                     }
                   }
@@ -134,41 +136,11 @@ trait NominationProtocol[F[_]] extends BaseProtocol[F] {
         slot.pureSP[F]
     }
 
-    def emitNomination(slot: Slot): SP[F, Slot] = {
-      for {
-        _      <- logService.info(s"try to emit nomination for $slot")
-        qs     <- quorumSetService.quorumFunction(slot.nodeId)
-        hash   <- quorumSetService.hashOfQuorumSet(qs)
-        msg    <- messageService.createNominationMessage(slot, hash)
-        _      <- logService.info(s"create new nomination message: $msg")
-        result <- runNominationProtocol(slot, msg, self = true)
-        _      <- logService.info(s"run nomination locally return $result")
-        xSlot <- if (result._2 != Message.State.valid) result._1.pureSP[F]
-        else {
-          for {
-            isNew <- if (slot.nominateTracker.lastEmittedMessage.isEmpty) true.pureSP[F]
-            else
-              messageService.firstNominationStatementIsNewer(
-                msg.statement,
-                slot.nominateTracker.lastEmittedMessage.get.statement): SP[F, Boolean]
-
-            _ <- logService.debug(s"message try to be emitted isNew ? $isNew")
-
-            s0 <- if (isNew) for {
-              s1 <- slotService.emitNominateMessage(result._1, msg): SP[F, Slot]
-              _  <- if (slot.fullValidated) applicationExtension.emitMessage(msg): SP[F, Unit] else ().pureSP[F]
-            } yield s1
-            else result._1.pureSP[F]
-          } yield s0
-        }
-      } yield xSlot
-    }
-
     def gotNewCandidate(slot: Slot): SP[F, Slot] = {
       for {
         composite <- applicationExtension.combineValues(slot.nominateTracker.candidates)
         xSlot     <- slotService.updateCompositeCandidateValue(slot, composite)
-        ySlot         <- ballotProtocol.bumpState(xSlot, composite, force = false)
+        ySlot     <- ballotProtocol.bumpState(xSlot, composite, force = false)
       } yield ySlot
     }
 
@@ -191,6 +163,111 @@ trait NominationProtocol[F[_]] extends BaseProtocol[F] {
     } yield result
   }
 
+  def nominate(slot: Slot, value: Value, previousValue: Value, timeout: Boolean): SP[F, Boolean] = {
+    def check(): SP[F, Boolean] =
+      for {
+        x <- if (timeout && !slot.nominateTracker.nominationStarted)
+          for {
+            _ <- logService.info("nominate TIMED OUT")
+            x <- false.pureSP[F]
+          } yield x
+        else true.pureSP[F]
+      } yield x
+
+    def allQs(qs: QuorumSet, acc: Vector[QuorumSet]): Vector[QuorumSet] = {
+      if (qs.innerSets.isEmpty) acc :+ qs
+      else {
+        val in = qs.innerSets.foldLeft(Vector.empty[QuorumSet]) { (acc1, n) =>
+          acc1 ++ allQs(n, Vector.empty)
+        }
+        acc ++ in
+      }
+    }
+
+    def getNewValueFromNomination(slot: Slot, nominationStatement: NominationStatement):SP[F, Option[Value]] = {
+      nominationStatement match {
+        case x: Message.Nominate =>
+          (x.votes ++ x.accepted).foldLeft((Option.empty[Value], 0L).pureSP[F]) {(acc, n) =>
+            for {
+              pre <- acc
+              vl <- applicationExtension.validateNominationValue(n)
+              vlOpt <- if (vl == Value.Validity.FullyValidated) Option(n).pureSP[F] else
+                applicationExtension.extractValidValue(slot, n): SP[F, Option[Value]]
+              x <- if (vlOpt.isDefined && !slot.nominateTracker.voted.contains(vlOpt.get)) {
+                for {
+                  curHash <- slotService.computeValueHash(slot, vlOpt.get): SP[F, Long]
+                } yield if(curHash >= pre._2) (vlOpt, curHash) else pre
+              } else acc
+            } yield x
+          }.map(_._1)
+      }
+    }
+
+    def getNominatingValue(slot: Slot): SP[F, Vector[Value]] = {
+      if (slot.nominateTracker.roundLeaders.contains(slot.nodeId)) Vector(value).pureSP[F]
+      else {
+        val roundLeaders = slot.nominateTracker.roundLeaders.filter(slot.nominateTracker.latestNominations.contains)
+        roundLeaders.foldLeft(Vector.empty[Value].pureSP[F]) { (acc, n) =>
+          for {
+            pre <- acc
+            valueOpt <- getNewValueFromNomination(slot, slot.nominateTracker.latestNominations(n).statement)
+          } yield if(valueOpt.isDefined) pre :+ valueOpt.get else pre
+        }
+      }
+    }
+
+    def findRoundLeaders(slot: Slot, qs: QuorumSet, topPriority: Long): SP[F, Vector[Node.ID]] = {
+
+      val allFlatQs = allQs(qs, Vector.empty)
+
+      // default roundLeaders include local node id
+      allFlatQs
+        .flatMap(_.validators)
+        .foldLeft((Vector(slot.nodeId), Option.empty[Long]).pureSP[F]) { (acc, n) =>
+          for {
+            res         <- acc
+            tp <- if (res._2.isEmpty) topPriority.pureSP[F] else res._2.get.pureSP[F]
+            w           <- nodeService.getNodePriority(slot, n, qs): SP[F, Long]
+            res <- if (w > tp) {
+              (Vector.empty[Node.ID], Option(w)).pureSP[F]
+            } else if (w == tp && w > 0) {
+              (res._1 :+ n, res._2).pureSP[F]
+            } else acc
+          } yield res
+        }
+        .map(_._1)
+    }
+
+    def updateRoundLeaders(slot: Slot): SP[F, Slot] =
+      for {
+        qs           <- quorumSetService.quorumFunction(slot.nodeId)
+        qsN          <- quorumSetService.normalizeQuorumSet(qs, slot.nodeId)
+        topPriority  <- nodeService.getNodePriority(slot, slot.nodeId, qsN)
+        roundLeaders <- findRoundLeaders(slot, qsN, topPriority)
+        xSlot        <- slotService.setNominationRoundLeaders(slot, roundLeaders)
+      } yield xSlot
+
+    for {
+      _ <- logService.info(
+        s"nominate $value to Slot(${slot.index} at round ${slot.nominateTracker.roundNumber}")
+      passed <- check()
+      nv    <- getNominatingValue(slot)
+      m <- if (passed && nv.nonEmpty) for {
+        xSlot <- slotService.setNominatingValue(slot, nv, previousValue)
+        ySlot <- updateRoundLeaders(xSlot)
+        ts    <- applicationExtension.computeTimeoutForNomination(xSlot)
+        _ <- applicationExtension.setupTimer(
+          xSlot,
+          ts,
+          Callback(() => {nominate(xSlot, value, previousValue, timeout = true);()}))
+        modified <- slotService.hasBeenModifiedInNomination(ySlot, slot)
+        zSlot    <- if (modified) emitNomination(ySlot) else ySlot.pureSP[F]
+        _        <- slotStore.saveSlotForNode(slot.nodeId, zSlot)
+      } yield modified
+      else passed.pureSP[F]
+    } yield m
+  }
+
   /**
     * is the statement sane?
     * @param statement statement
@@ -211,5 +288,35 @@ trait NominationProtocol[F[_]] extends BaseProtocol[F] {
     else {
       messageService.firstNominationStatementIsNewer(statement, savedNominationOpt.get.statement)
     }
+  }
+  private def emitNomination(slot: Slot): SP[F, Slot] = {
+    for {
+      _      <- logService.info(s"try to emit nomination for $slot")
+      qs     <- quorumSetService.quorumFunction(slot.nodeId)
+      hash   <- quorumSetService.hashOfQuorumSet(qs)
+      msg    <- messageService.createNominationMessage(slot, hash)
+      _      <- logService.info(s"create new nomination message: $msg")
+      result <- runNominationProtocol(slot, msg, self = true)
+      _      <- logService.info(s"run nomination locally return $result")
+      xSlot <- if (result._2 != Message.State.valid) result._1.pureSP[F]
+      else {
+        for {
+          isNew <- if (slot.nominateTracker.lastEmittedMessage.isEmpty) true.pureSP[F]
+          else
+            messageService.firstNominationStatementIsNewer(
+              msg.statement,
+              slot.nominateTracker.lastEmittedMessage.get.statement): SP[F, Boolean]
+
+          _ <- logService.debug(s"message try to be emitted isNew ? $isNew")
+
+          s0 <- if (isNew) for {
+            s1 <- slotService.emitNominateMessage(result._1, msg): SP[F, Slot]
+            _ <- if (slot.fullValidated) applicationExtension.emitMessage(msg): SP[F, Unit]
+            else ().pureSP[F]
+          } yield s1
+          else result._1.pureSP[F]
+        } yield s0
+      }
+    } yield xSlot
   }
 }

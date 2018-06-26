@@ -107,6 +107,8 @@ import bigknife.sop.implicits._
     */
   def updateCompositeCandidateValue(slot: Slot, compositeValue: Value): P[F, Slot]
 
+  def setNominatingValue(slot: Slot, values: Vector[Value], previousValue: Value): P[F, Slot]
+
   /**
     * update slot's prepared
     * @param slot slot
@@ -125,6 +127,7 @@ import bigknife.sop.implicits._
 
   def setHeardFromQuorum(slot: Slot, heard: Boolean): P[F, Slot]
 
+  def setNominationRoundLeaders(slot: Slot, roundLeaders: Vector[Node.ID]): P[F, Slot]
   /**
     * try to advance slot message level if the message level is permitted
     * @param slot slot

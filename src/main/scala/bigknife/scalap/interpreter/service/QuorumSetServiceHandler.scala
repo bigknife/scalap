@@ -124,6 +124,39 @@ class QuorumSetServiceHandler extends QuorumSetService.Handler[Stack] {
       validators = Vector(nodeId)
     )
   }
+
+  override def normalizeQuorumSet(quorumSet: QuorumSet, toRemove: ID): Stack[QuorumSet] = Stack {
+    def normalizeQSet(qs: QuorumSet, toRemove: Node.ID): QuorumSet = {
+      // helper function that:
+      //  * removes nodeID
+      //      { t: n, v: { ...BEFORE... , nodeID, ...AFTER... }, ...}
+      //      { t: n-1, v: { ...BEFORE..., ...AFTER...} , ... }
+      //  * simplifies singleton inner set into outerset
+      //      { t: n, v: { ... }, { t: 1, X }, ... }
+      //        into
+      //      { t: n, v: { ..., X }, .... }
+      //  * simplifies singleton innersets
+      //      { t:1, { innerSet } } into innerSet
+      val validatorsRemoved = qs.validators.dropWhile(_ == toRemove)
+      val qs1 = qs.copy(validators = validatorsRemoved)
+      val qs2 = qs1.innerSets.foldLeft(qs1) {(acc, n) =>
+        val qsx = normalizeQSet(n, toRemove)
+        // merge singleton inner sets into validator list
+        if (qsx.threshold == 1 && qsx.validators.length == 1 && qsx.innerSets.length == 0) {
+          acc.copy(
+            validators = acc.validators :+ qsx.validators.head,
+            innerSets = acc.innerSets.dropWhile(_ == n)
+          )
+        }else acc
+      }
+      // simplify quorum set if needed
+      if (qs2.threshold == 1 && qs2.validators.isEmpty && qs2.innerSets.length == 1) {
+        qs2.innerSets.head
+      } else qs2
+    }
+
+    normalizeQSet(quorumSet, toRemove)
+  }
 }
 
 object QuorumSetServiceHandler {

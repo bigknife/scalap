@@ -15,6 +15,7 @@ object component {
     val slotService: SlotService[F]
     val messageService: MessageService[F]
     val nodeStore: NodeStore[F]
+    val nodeService: NodeService[F]
     val quorumSetService: QuorumSetService[F]
     val quorumSetStore: QuorumSetStore[F]
     val logService: LogService[F]

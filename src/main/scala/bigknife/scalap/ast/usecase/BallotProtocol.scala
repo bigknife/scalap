@@ -188,7 +188,7 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
 
     values.foldLeft((Validity.fullyValidated, slot).pureSP[F]) { (acc, n) =>
       for {
-        tr  <- validateBallotValue(n)
+        tr  <- applicationExtension.validateBallotValue(n)
         pre <- acc
       } yield {
         tr match {

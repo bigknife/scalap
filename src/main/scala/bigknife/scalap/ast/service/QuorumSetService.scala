@@ -50,4 +50,6 @@ import bigknife.sop.implicits._
     * @return
     */
   def hashOfQuorumSet(quorumSet: QuorumSet): P[F, Hash]
+
+  def normalizeQuorumSet(quorumSet: QuorumSet, toRemove: Node.ID): P[F, QuorumSet]
 }

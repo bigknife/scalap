@@ -24,6 +24,15 @@ case class QuorumSet(
       s"QS($threshold,Validators($validatorsStr),Inner($innerSetsStr))"
     }
   }
+
+  /*
+  override def equals(obj: scala.Any): Boolean = obj match {
+    case that: QuorumSet =>
+      this.threshold == that.threshold &&
+      this.validators == that.validators &&
+      this.innerSets == that.innerSets
+    case _ => false
+  }*/
 }
 
 object QuorumSet {
