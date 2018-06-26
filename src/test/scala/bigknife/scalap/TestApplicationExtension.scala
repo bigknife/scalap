@@ -56,7 +56,7 @@ class TestApplicationExtension extends ApplicationExtension.Handler[Stack] {
     slot.nominateTracker.roundNumber * 1000L
   }
 
-  override def setupTimer(slot: Slot, timeout: Long, callback: Callback): Stack[Unit] = Stack {
+  override def setupTimer(slot: Slot, timeout: Long, reNominateArgs: ReNominateArgs): Stack[Unit] = Stack {setting =>
     val timer = if (timerCache.contains("nomination-timer")) {
       timerCache("nomination-timer")
     } else {
@@ -66,8 +66,12 @@ class TestApplicationExtension extends ApplicationExtension.Handler[Stack] {
     }
 
     timer.schedule(new TimerTask {
-      override def run(): Unit = callback.run()
-    }, timeout, timeout)
+      override def run(): Unit = {
+        //callback.run()
+        setting.reNominate(slot, reNominateArgs)
+      }
+
+    }, timeout)
     ()
   }
 }

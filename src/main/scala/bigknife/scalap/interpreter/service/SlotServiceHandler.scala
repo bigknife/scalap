@@ -266,6 +266,12 @@ class SlotServiceHandler extends SlotService.Handler[Stack] {
     )
   }
 
+  override def startNewNominationRound(slot: Slot): Stack[Slot] = Stack {
+    slot.copy(nominateTracker = slot.nominateTracker.copy(
+      roundNumber =  slot.nominateTracker.roundNumber + 1
+    ))
+  }
+
   override def setNominatingValue(slot: Slot, values: Vector[Value], previousValue: Value): Stack[Slot] = Stack {
     slot.copy(
       nominateTracker = slot.nominateTracker.copy(

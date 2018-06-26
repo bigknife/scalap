@@ -108,6 +108,7 @@ import bigknife.sop.implicits._
   def updateCompositeCandidateValue(slot: Slot, compositeValue: Value): P[F, Slot]
 
   def setNominatingValue(slot: Slot, values: Vector[Value], previousValue: Value): P[F, Slot]
+  def startNewNominationRound(slot: Slot): P[F, Slot]
 
   /**
     * update slot's prepared

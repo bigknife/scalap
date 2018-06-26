@@ -56,5 +56,5 @@ import bigknife.sop.implicits._
     */
   def computeTimeoutForNomination(slot: Slot): P[F, Long]
 
-  def setupTimer(slot: Slot, timeout: Long, callback: Callback): P[F, Unit]
+  def setupTimer(slot: Slot, timeout: Long, reNominateArgs: ReNominateArgs): P[F, Unit]
 }

@@ -14,13 +14,14 @@ class MessageServiceHandler extends MessageService.Handler[Stack] {
     Stack {
       def isAsc(values: Vector[Value]): Boolean =
         !values.sliding(2).exists {
+          case Vector() => true
           case Vector(l)    => false
           case Vector(l, r) => l > r
         }
 
       statement match {
         case x: Message.Nominate =>
-          val sane = x.votes.nonEmpty && x.accepted.nonEmpty &&
+          val sane = (x.votes.length + x.accepted.length) != 0 &&
             isAsc(x.votes) && isAsc(x.accepted)
           logger.debug(s"nomination statement is sane? $sane")
           sane

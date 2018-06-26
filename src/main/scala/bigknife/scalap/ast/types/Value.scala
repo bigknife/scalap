@@ -12,6 +12,8 @@ object Value {
   val Bottom: Value = new Value {
     override def orderFactor: Int = Int.MinValue
     override def asBytes: Array[Byte] = Array.emptyByteArray
+
+    override def toString: String = "Value(Bottom)"
   }
 
   trait Validity

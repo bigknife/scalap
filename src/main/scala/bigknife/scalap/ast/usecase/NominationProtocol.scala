@@ -249,23 +249,25 @@ trait NominationProtocol[F[_]] extends BaseProtocol[F] {
 
     for {
       _ <- logService.info(
-        s"nominate $value to Slot(${slot.index} at round ${slot.nominateTracker.roundNumber}")
+        s"nominate $value to Slot(${slot.index} at round ${slot.nominateTracker.roundNumber})")
       _        <- slotStore.saveSlotForNode(slot.nodeId, slot)
       passed <- check()
       _ <- logService.info(s"check nominate: $passed")
       m <- if (passed) for {
-        xSlot <- slotService.setNominatingValue(slot, Vector(), previousValue)
+        x0Slot <- slotService.startNewNominationRound(slot)
+        xSlot <- slotService.setNominatingValue(x0Slot, Vector(), previousValue)
         ySlot <- updateRoundLeaders(xSlot)
         nv    <- getNominatingValue(ySlot)
         zSlot <- slotService.setNominatingValue(ySlot, nv, previousValue)
         ts    <- applicationExtension.computeTimeoutForNomination(zSlot)
-        _ <- applicationExtension.setupTimer(
-          zSlot,
-          ts,
-          Callback(() => {nominate(zSlot, value, previousValue, timeout = true);()}))
         modified <- slotService.hasBeenModifiedInNomination(zSlot, slot)
-        z0Slot    <- if (modified) emitNomination(ySlot) else ySlot.pureSP[F]
+        _ <- logService.info(s"slot(${slot.index}) has been modified: $modified")
+        z0Slot    <- if (modified) emitNomination(zSlot) else zSlot.pureSP[F]
         _        <- slotStore.saveSlotForNode(slot.nodeId, z0Slot)
+        _ <- applicationExtension.setupTimer(
+          z0Slot,
+          ts,
+          ReNominateArgs(value, previousValue, timeout = true))
       } yield modified
       else passed.pureSP[F]
     } yield m

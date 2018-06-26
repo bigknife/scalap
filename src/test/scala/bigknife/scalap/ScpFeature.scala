@@ -59,7 +59,17 @@ class ScpFeature extends FeatureSpec with GivenWhenThen {
       val value = env.simpleValue(10)
 
       Given("system setting with node id v1, qsV1")
-      val setting = Setting(nodeId = v1, quorumSet = qsV1)
+      lazy val setting: Setting = Setting(nodeId = v1, quorumSet = qsV1,
+        reNominate = (slot, reNominateArgs) => {
+          val p = for {
+            state <- env.scpTest.nominate(slot, reNominateArgs.value, reNominateArgs.previousValue, timeout = reNominateArgs.timeout)
+            slot <- env.scpTest.getSlot(slot.nodeId, 0)
+          } yield (state, slot)
+
+          val messageState = runner.runIO(p, setting).unsafeRunSync()
+          info(s"messageState1 = $messageState")
+
+        })
 
       Given("create nominate program")
       val p = for {
@@ -72,6 +82,8 @@ class ScpFeature extends FeatureSpec with GivenWhenThen {
 
       Then("get the message state and slot states")
       info(s"messageState = $messageState")
+
+      Thread.sleep(1000000)
     }
   }
 }
