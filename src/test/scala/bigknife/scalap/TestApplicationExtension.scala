@@ -65,7 +65,6 @@ class TestApplicationExtension extends ApplicationExtension.Handler[Stack] {
       t
     }
 
-    timer.cancel()
     timer.schedule(new TimerTask {
       override def run(): Unit = callback.run()
     }, timeout, timeout)

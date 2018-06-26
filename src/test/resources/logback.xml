@@ -13,7 +13,7 @@
         </encoder>
     </appender>
 
-    <logger name="scalap.ast" additivity="false" level="ERROR">
+    <logger name="scalap.ast" additivity="false" level="info">
         <appender-ref ref="AST" />
     </logger>
 

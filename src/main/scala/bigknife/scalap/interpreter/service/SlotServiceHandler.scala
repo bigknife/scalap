@@ -272,7 +272,7 @@ class SlotServiceHandler extends SlotService.Handler[Stack] {
         nominationStarted = true,
         previousValue = Some(previousValue),
         voted = slot.nominateTracker.voted ++ values,
-        roundNumber = slot.nominateTracker.roundNumber + 1
+        roundNumber = if(values.isEmpty) slot.nominateTracker.roundNumber else slot.nominateTracker.roundNumber + 1
       )
     )
   }

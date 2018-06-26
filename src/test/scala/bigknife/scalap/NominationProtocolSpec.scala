@@ -6,7 +6,7 @@ import bigknife.scalap.ast.usecase.component._
 import bigknife.scalap.interpreter._
 import bigknife.scalap.interpreter.service.QuorumSetServiceHandler
 import cats.kernel.instances.hash
-import org.scalatest.FunSuite
+import org.scalatest._
 
 class NominationProtocolSpec extends FunSuite {
 
@@ -21,7 +21,12 @@ class NominationProtocolSpec extends FunSuite {
     qsHandler.hashOfQuorumSet(qs)(setting).unsafeRunSync()
   }
 
-  test("test program") {
+  test("nominate value") {
+    val scpTest = SCPTest[component.Model.Op]
+
+  }
+
+  ignore("test program") {
     // prepare data
     val nodeIds         = Vector("v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8").map(x => Node.ID(sha3(x)))
     val slotIndex: Long = 1

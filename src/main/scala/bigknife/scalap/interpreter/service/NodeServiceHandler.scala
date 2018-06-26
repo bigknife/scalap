@@ -29,14 +29,46 @@ class NodeServiceHandler extends NodeService.Handler[Stack] {
       .getOrElse(0)
   }
 
-  private def hashNode(slot: Slot, isPriority: Boolean, nodeId: Node.ID): Long = ???
+  private def hashNode(slot: Slot, isPriority: Boolean, nodeId: Node.ID): Long = {
+    import java.nio._
+    val f1 = {
+      val bb = ByteBuffer.allocate(8)
+      val n = slot.index
+      bb.putLong(n)
+      bb.array()
+    }
+    val f2 = {
+      val bb = ByteBuffer.allocate(4)
+      val n = slot.nominateTracker.roundNumber
+      bb.putInt(n)
+      bb.array()
+    }
+    val f3 = {
+      val n = if(isPriority) 2 else 1
+      val bb = ByteBuffer.allocate(4)
+      bb.putInt(n)
+      bb.array()
+    }
+    val f4 = nodeId.value
+    val f5 = slot.nominateTracker.previousValue.get.asBytes
+    val bytes = misc.crypto.sha3(f1 ++ f2 ++ f3++ f4 ++ f5)
+    val l = new java.math.BigInteger(bytes).longValue()
+    asUnsignedLong(l)
+  }
 
   private def bigDivide(a: Long, b: Long, c: Long): Long = {
     val a1 = BigDecimal(a)
     val b1 = BigDecimal(b)
     val c1 = BigDecimal(c)
 
-    ((a1 * b1) / c1).setScale(0, RoundingMode.UP).longValue()
+    val l = ((a1 * b1) / c1).setScale(0, RoundingMode.UP).longValue()
+    asUnsignedLong(l)
+  }
+
+  private def asUnsignedLong(l: Long): Long = {
+    //val bi = java.math.BigInteger.valueOf(l)
+    //if (bi.signum() < 0) bi.add(java.math.BigInteger.ONE.shiftLeft(64)).toString().toLong else l
+    l.abs
   }
 
   private def _bigDivide(a: Long, b: Long, c: Long): (Long, Boolean) = {
