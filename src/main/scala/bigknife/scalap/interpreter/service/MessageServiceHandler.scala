@@ -273,7 +273,8 @@ class MessageServiceHandler extends MessageService.Handler[Stack] {
 }
 
 object MessageServiceHandler {
+  private val _inst = new MessageServiceHandler
   trait Implicits {
-    implicit val messageServiceHandler: MessageServiceHandler = new MessageServiceHandler
+    implicit val messageServiceHandler: MessageServiceHandler = _inst
   }
 }

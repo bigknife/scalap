@@ -20,7 +20,8 @@ class QuorumSetStoreHandler extends QuorumSetStore.Handler[Stack] {
 }
 
 object QuorumSetStoreHandler {
+  private val _inst = new QuorumSetStoreHandler
   trait Implicits {
-    implicit val quorumSetStoreHandler: QuorumSetStoreHandler = new QuorumSetStoreHandler
+    implicit val quorumSetStoreHandler: QuorumSetStoreHandler = _inst
   }
 }

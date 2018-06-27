@@ -17,6 +17,10 @@
         <appender-ref ref="AST" />
     </logger>
 
+    <logger name="bigknife.scalap" additivity="false" level="info">
+        <appender-ref ref="AST" />
+    </logger>
+
     <root level="warn">
         <appender-ref ref="COLOR"/>
     </root>

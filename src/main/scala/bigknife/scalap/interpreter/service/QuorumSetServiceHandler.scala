@@ -160,8 +160,8 @@ class QuorumSetServiceHandler extends QuorumSetService.Handler[Stack] {
 }
 
 object QuorumSetServiceHandler {
+  private val _inst = new QuorumSetServiceHandler
   trait Implicits {
-    implicit val quorumSetServiceHandler: QuorumSetServiceHandler =
-      new QuorumSetServiceHandler
+    implicit val quorumSetServiceHandler: QuorumSetServiceHandler = _inst
   }
 }
