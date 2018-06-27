@@ -89,7 +89,8 @@ object Common {
     object scalap extends _mkPrj {
       def apply(): Project = apply("scalap", ".")
         .settings(
-          libraryDependencies ++= all.cats
+          libraryDependencies ++= all.cats,
+          libraryDependencies ++= all.bcprov
         )
     }
   }
