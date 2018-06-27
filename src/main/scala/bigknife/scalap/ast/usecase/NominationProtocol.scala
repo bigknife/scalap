@@ -28,11 +28,11 @@ trait NominationProtocol[F[_]] extends BaseProtocol[F] {
     val verify: SP[F, Boolean] = for {
       storedSlotOpt <- slotStore.getSlotOfNode(slot.nodeId, slot.index)
       x0            <- if (storedSlotOpt.isEmpty) true.pureSP[F] else (storedSlotOpt.get == slot).pureSP[F]
-      _             <- logService.info(s"is consistent with local store ? $x0")
+      _             <- logService.info(s"is consistent with local store ? $x0", Some("nominate"))
       x             <- isSane(message.statement)
-      _             <- logService.info(s"is sane? $x for $message")
+      _             <- logService.info(s"is sane? $x for $message", Some("nominate"))
       y             <- isNewer(slot, message.statement)
-      _             <- logService.info(s"is newer? $y for $message")
+      _             <- logService.info(s"is newer? $y for $message", Some("nominate"))
     } yield x0 && x && y
 
     def votedPredict(value: Value) = Message.Statement.predict {
@@ -174,10 +174,10 @@ trait NominationProtocol[F[_]] extends BaseProtocol[F] {
         // slot should be consistent with the local
         localSlotOpt <- slotStore.getSlotOfNode(slot.nodeId, slot.index)
         x0 <- if (localSlotOpt.isEmpty) true.pureSP[F] else (localSlotOpt.get == slot).pureSP[F]
-        _ <- logService.info(s"when nominating, is consistent with local store? $x0")
+        _ <- logService.info(s"when nominating, is consistent with local store? $x0", Some("nominate"))
         x <- if (timeout && !slot.nominateTracker.nominationStarted)
           for {
-            _ <- logService.info("nominate TIMED OUT")
+            _ <- logService.info("nominate TIMED OUT", Some("nominate"))
             x <- false.pureSP[F]
           } yield x0 && x
         else true.pureSP[F]
@@ -266,10 +266,10 @@ trait NominationProtocol[F[_]] extends BaseProtocol[F] {
 
     for {
       _ <- logService.info(
-        s"nominate $value to Slot(${slot.index} at round ${slot.nominateTracker.roundNumber})")
+        s"nominate $value to Slot(${slot.index} at round ${slot.nominateTracker.roundNumber})", Some("nominate"))
       //_      <- slotStore.saveSlotForNode(slot.nodeId, slot)
       passed <- check()
-      _      <- logService.info(s"check nominate: $passed")
+      _      <- logService.info(s"check nominate: $passed", Some("nominate"))
       m <- if (passed) for {
         x0Slot   <- slotService.startNewNominationRound(slot)
         xSlot    <- slotService.setNominatingValue(x0Slot, Vector(), previousValue)
@@ -278,7 +278,7 @@ trait NominationProtocol[F[_]] extends BaseProtocol[F] {
         zSlot    <- slotService.setNominatingValue(ySlot, nv, previousValue)
         ts       <- applicationExtension.computeTimeoutForNomination(zSlot)
         modified <- slotService.hasBeenModifiedInNomination(zSlot, slot)
-        _        <- logService.info(s"slot(${slot.index}) has been modified: $modified")
+        _        <- logService.info(s"slot(${slot.index}) has been modified: $modified", Some("nominate"))
         _        <- slotStore.saveSlotForNode(slot.nodeId, zSlot)
         z0Slot   <- if (modified) emitNomination(zSlot) else zSlot.pureSP[F]
         _        <- slotStore.saveSlotForNode(slot.nodeId, z0Slot)
@@ -313,14 +313,14 @@ trait NominationProtocol[F[_]] extends BaseProtocol[F] {
   }
   private def emitNomination(slot: Slot): SP[F, Slot] = {
     for {
-      _      <- logService.info(s"try to emit nomination for $slot")
+      _      <- logService.info(s"try to emit nomination for $slot", Some("nominate"))
       qs     <- quorumSetService.quorumFunction(slot.nodeId)
       hash   <- quorumSetService.hashOfQuorumSet(qs)
       msg    <- messageService.createNominationMessage(slot, hash)
-      _      <- logService.info(s"create new nomination message: $msg")
+      _      <- logService.info(s"create new nomination message: $msg", Some("nominate"))
       _      <- slotStore.saveSlotForNode(slot.nodeId, slot)
       result <- runNominationProtocol(slot, msg, self = true)
-      _      <- logService.info(s"run nomination locally return $result")
+      _      <- logService.info(s"run nomination locally return $result", Some("nominate"))
       xSlot <- if (result._2 != Message.State.valid) result._1.pureSP[F]
       else {
         for {
@@ -330,7 +330,7 @@ trait NominationProtocol[F[_]] extends BaseProtocol[F] {
               msg.statement,
               slot.nominateTracker.lastEmittedMessage.get.statement): SP[F, Boolean]
 
-          _ <- logService.debug(s"message try to be emitted isNew ? $isNew")
+          _ <- logService.debug(s"message try to be emitted isNew ? $isNew", Some("nominate"))
 
           s0 <- if (isNew) for {
             s1 <- slotService.emitNominateMessage(result._1, msg): SP[F, Slot]

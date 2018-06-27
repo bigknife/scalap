@@ -89,13 +89,13 @@ trait BaseProtocol[F[_]] {
     for {
       qs                  <- quorumSetService.quorumFunction(slot.nodeId)
       acceptedByVBlocking <- quorumSetService.isVBlocking(qs, acceptedNodes)
-      _ <- logService.info(s"accepted($acceptedNodes} by vblocking of $qs ? $acceptedByVBlocking")
+      _ <- logService.info(s"accepted($acceptedNodes) by vblocking of $qs ? $acceptedByVBlocking", Some("federate"))
       acceptedByQuorum <- if (acceptedByVBlocking) true.pureSP[F]
       else
         for {
           nodes    <- ratifiedNodes(ratifiedMessages)
           accepted <- quorumSetService.isQuorumSlice(qs, nodes)
-          _ <- logService.info(s"ratified($nodes) is a quorum slice of $qs ? $accepted")
+          _ <- logService.info(s"ratified($nodes) is a quorum slice of $qs ? $accepted", Some("federate"))
         } yield accepted
     } yield acceptedByQuorum
 
