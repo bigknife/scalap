@@ -17,7 +17,7 @@
         <appender-ref ref="AST" />
     </logger>
 
-    <logger name="bigknife.scalap.TestApplicationExtension" additivity="false" level="info">
+    <logger name="bigknife.scalap" additivity="false" level="info">
         <appender-ref ref="AST" />
     </logger>
 
