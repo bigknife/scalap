@@ -29,7 +29,8 @@ class LogServiceHandler extends LogService.Handler[Stack]{
 }
 
 object LogServiceHandler {
+  private val _inst = new LogServiceHandler
   trait Implicits {
-    implicit val logService: LogServiceHandler = new LogServiceHandler
+    implicit val logService: LogServiceHandler = _inst
   }
 }

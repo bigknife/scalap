@@ -294,7 +294,8 @@ class SlotServiceHandler extends SlotService.Handler[Stack] {
 }
 
 object SlotServiceHandler {
+  private val _inst = new SlotServiceHandler
   trait Implicits {
-    implicit val slotServiceHandler: SlotServiceHandler = new SlotServiceHandler
+    implicit val slotServiceHandler: SlotServiceHandler = _inst
   }
 }

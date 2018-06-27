@@ -32,7 +32,7 @@ trait NominationProtocol[F[_]] extends BaseProtocol[F] {
       x             <- isSane(message.statement)
       _             <- logService.info(s"is sane? $x for $message")
       y             <- isNewer(slot, message.statement)
-      _             <- logService.info(s"is newer? $x for $message")
+      _             <- logService.info(s"is newer? $y for $message")
     } yield x0 && x && y
 
     def votedPredict(value: Value) = Message.Statement.predict {

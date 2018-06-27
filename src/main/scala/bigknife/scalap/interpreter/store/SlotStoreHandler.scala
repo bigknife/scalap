@@ -20,7 +20,8 @@ class SlotStoreHandler extends SlotStore.Handler[Stack]{
 }
 
 object SlotStoreHandler {
+  private val _inst = new SlotStoreHandler
   trait Implicits {
-    implicit val slotStoreHandler: SlotStoreHandler = new SlotStoreHandler
+    implicit val slotStoreHandler: SlotStoreHandler = _inst
   }
 }

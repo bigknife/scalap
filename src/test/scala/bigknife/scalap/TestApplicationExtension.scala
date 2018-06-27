@@ -8,14 +8,14 @@ import bigknife.scalap.ast.types._
 import bigknife.scalap.interpreter.Stack
 import org.slf4j.{Logger, LoggerFactory}
 
-class TestApplicationExtension extends ApplicationExtension.Handler[Stack] {
+trait TestApplicationExtension extends ApplicationExtension.Handler[Stack] {
+  implicit val valueCombiner: Value.ValueCombiner
+
   private val logger: Logger = LoggerFactory.getLogger(getClass)
   private val timerCache: collection.mutable.Map[String, java.util.Timer] =
     collection.mutable.Map.empty
   override def combineValues(values: Vector[Value]): Stack[Value] = Stack {
-    values.map(_.asInstanceOf[TestValue]).fold(TestValue("")) {
-      case (TestValue(a), TestValue(b)) => TestValue(a + "\n" + b)
-    }
+    valueCombiner.combine(values)
   }
 
   override def validateNominationValue(value: Value): Stack[Value.Validity] = Stack {
@@ -56,29 +56,33 @@ class TestApplicationExtension extends ApplicationExtension.Handler[Stack] {
     slot.nominateTracker.roundNumber * 1000L
   }
 
-  override def setupTimer(slot: Slot, timeout: Long, reNominateArgs: ReNominateArgs): Stack[Unit] = Stack {setting =>
-    val timer = if (timerCache.contains("nomination-timer")) {
-      timerCache("nomination-timer")
-    } else {
-      val t = new java.util.Timer("nomination-timer")
-      timerCache.put("nomination-timer", t)
-      t
-    }
-
-    timer.schedule(new TimerTask {
-      override def run(): Unit = {
-        //callback.run()
-        setting.reNominate(slot, reNominateArgs)
+  override def setupTimer(slot: Slot, timeout: Long, reNominateArgs: ReNominateArgs): Stack[Unit] =
+    Stack { setting =>
+      val timer = if (timerCache.contains("nomination-timer")) {
+        timerCache("nomination-timer")
+      } else {
+        val t = new java.util.Timer("nomination-timer")
+        timerCache.put("nomination-timer", t)
+        t
       }
 
-    }, timeout)
-    ()
-  }
+      timer.schedule(new TimerTask {
+        override def run(): Unit = {
+          //callback.run()
+          setting.reNominate(slot, reNominateArgs)
+        }
+
+      }, timeout)
+      ()
+    }
 }
 
 object TestApplicationExtension {
   trait Implicits {
-    implicit val applicationExtension: ApplicationExtension.Handler[Stack] =
-      new TestApplicationExtension
+    implicit def applicationExtension(
+        implicit C: Value.ValueCombiner): ApplicationExtension.Handler[Stack] =
+      new TestApplicationExtension {
+        override implicit val valueCombiner: Value.ValueCombiner = C
+      }
   }
 }

@@ -1,16 +1,21 @@
 package bigknife.scalap.ast.types
 
 trait Value extends Ordered[Value] {
-  def orderFactor: Int
+  def orderFactor: Long
   def asBytes: Array[Byte]
 
-  override def compare(that: Value): Int = this.orderFactor - that.orderFactor
+  override def compare(that: Value): Int = {
+    val l = this.orderFactor - that.orderFactor
+
+    def loop(l: Long): Long = if (l > Int.MaxValue.toLong) loop(l - Int.MaxValue.toLong) else l
+
+    loop(l).toInt
+  }
 }
 
 object Value {
-
   val Bottom: Value = new Value {
-    override def orderFactor: Int = Int.MinValue
+    override def orderFactor: Long = Long.MinValue
     override def asBytes: Array[Byte] = Array.emptyByteArray
 
     override def toString: String = "Value(Bottom)"
@@ -31,5 +36,13 @@ object Value {
     def fullyValidated: Validity = FullyValidated
     def invalid: Validity = Invalid
     def maybeValid: Validity = MaybeValid
+  }
+
+  trait ValueCombiner {
+    def combine(values: Vector[Value]): Value
+  }
+
+  object ValueCombiner {
+    def summon(f: Vector[Value] => Value): ValueCombiner = (values: Vector[Value]) => f(values)
   }
 }

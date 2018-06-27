@@ -84,7 +84,8 @@ class NodeServiceHandler extends NodeService.Handler[Stack] {
 }
 
 object NodeServiceHandler {
+  private val _inst = new NodeServiceHandler
   trait Implicits {
-    implicit val nodeServiceHandler: NodeServiceHandler = new NodeServiceHandler
+    implicit val nodeServiceHandler: NodeServiceHandler = _inst
   }
 }

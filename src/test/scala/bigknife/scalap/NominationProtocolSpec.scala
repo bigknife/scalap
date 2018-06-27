@@ -9,6 +9,7 @@ import cats.kernel.instances.hash
 import org.scalatest._
 
 class NominationProtocolSpec extends FunSuite {
+  val env = Fixture
 
   def sha3(s: Array[Byte]): Array[Byte] = {
     import org.bouncycastle.jcajce.provider.digest.SHA3
@@ -122,6 +123,13 @@ class NominationProtocolSpec extends FunSuite {
       _ <- p6
       x2 <- p3
     } yield (x0.get, x1.get, x2.get)
+
+    import env._
+    implicit val combiner = Value.ValueCombiner.summon {values =>
+      values.map(_.asInstanceOf[TestValue]).foldLeft(TestValue("")) {(acc, n)=>
+        TestValue(acc.str + n.str)
+      }
+    }
 
     val (s1,s2,s3) = runner.runIO(p, setting1).unsafeRunSync()
     info(s"slot1: lastMsg = ${s1.ballotTracker.lastMessage}")

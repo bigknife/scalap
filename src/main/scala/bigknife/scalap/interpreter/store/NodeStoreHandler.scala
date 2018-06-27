@@ -15,7 +15,8 @@ class NodeStoreHandler extends NodeStore.Handler[Stack] {
 }
 
 object NodeStoreHandler {
+  private val _inst = new NodeStoreHandler
   trait Implicits {
-    implicit val nodeStoreHandler: NodeStoreHandler = new NodeStoreHandler
+    implicit val nodeStoreHandler: NodeStoreHandler = _inst
   }
 }
