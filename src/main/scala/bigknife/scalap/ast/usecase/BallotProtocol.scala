@@ -23,9 +23,12 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
     def advanceSlot(slot: Slot, statement: BallotStatement): SP[F, Result] = {
       for {
         xSlotAdvanced <- slotService.tryAdvanceSlotBallotMessageLevel(slot)
-        _ <- logService.info(s"advanceSlot, currentMessageLevel = ${slot.ballotTracker.currentMessageLevel}", Some("ballot"))
+        _ <- logService.info(
+          s"advanceSlot, currentMessageLevel = ${slot.ballotTracker.currentMessageLevel}",
+          Some("ballot"))
         r <- if (!xSlotAdvanced._2) for {
-          _  <- logService.info("maximum number of transitions reached in advanceSlot", Some("ballot"))
+          _ <- logService.info("maximum number of transitions reached in advanceSlot",
+                               Some("ballot"))
           r0 <- validResult(slot)
         } yield r0
         else
@@ -68,7 +71,7 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
 
     // check the quorum set if sane
     val verify: SP[F, Boolean] = for {
-      sane  <- isSane(message.statement, self = false)
+      sane  <- isSane(slot, message.statement, self = false)
       _     <- logService.info(s"is sane? $sane for $message", Some("ballot"))
       newer <- isNewer(slot, message.statement)
       _     <- logService.info(s"is newer? $newer for $message", Some("ballot"))
@@ -79,7 +82,8 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
         valSlot <- validateValues(slot, message.statement)
         result <- if (valSlot._1 == Validity.Invalid) for {
           _ <- logService.error(
-            s"invalid value from ${if (self) "self" else "others"}, skipping $message", Some("ballot"))
+            s"invalid value from ${if (self) "self" else "others"}, skipping $message",
+            Some("ballot"))
           x <- invalidResult(valSlot._2)
         } yield x
         else processForSlot(valSlot._2)
@@ -135,11 +139,12 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
       case _ =>
         val newB = Ballot(n, if (h != Ballot.NullBallot) h.value else candidate)
         for {
-          _        <- logService.info(s"bumpState for Slot[${slot.index}] with value: ${newB.value}", Some("ballot"))
+          _ <- logService.info(s"bumpState for Slot[${slot.index}] with value: ${newB.value}",
+                               Some("ballot"))
           xSlot    <- updateCurrentValue(slot, newB)
           modified <- slotService.hasAdvancedBallotProcess(slot, xSlot)
           ySlot <- if (modified) for {
-            s0  <- emitCurrentStatement(xSlot)
+            s0 <- emitCurrentStatement(xSlot)
             s1 <- checkHeardFromQuorum(s0)
           } yield s1
           else xSlot.pureSP[F]
@@ -147,17 +152,19 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
     }
   }
 
-  private def isSane(statement: BallotStatement, self: Boolean): SP[F, Boolean] = {
+  private def isSane(slot: Slot, statement: BallotStatement, self: Boolean): SP[F, Boolean] = {
     for {
-      quorumSetOpt <- getQuorumSetFromStatement(statement)
+      quorumSetOpt <- getQuorumSetFromStatement(slot, statement)
       result <- if (quorumSetOpt.isEmpty) for {
-        _ <- logService.info(s"no quorum set found from statement($statement)", Some("ballot")): SP[F, Unit]
+        _ <- logService
+          .info(s"no quorum set found from statement($statement)", Some("ballot")): SP[F, Unit]
       } yield false
       else
         for {
           qsSane <- quorumSetService.isQuorumSetSane(quorumSetOpt.get, extractChecks = false)
           _ <- logService.info(
-            s"quorum set is sane? $qsSane, quorum set (${quorumSetOpt.get}) from statement($statement)", Some("ballot"))
+            s"quorum set is sane? $qsSane, quorum set (${quorumSetOpt.get}) from statement($statement)",
+            Some("ballot"))
           statementSane <- if (!qsSane) false.pureSP[F]
           else messageService.isSaneBallotStatement(statement, self): SP[F, Boolean]
         } yield statementSane
@@ -212,7 +219,7 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
             slotService.setPreparedBallot(slot, acceptedOpt.get): SP[F, Slot]
           else slot.pureSP[F]
           advanced <- slotService.hasAdvancedBallotProcess(slot, xSlot)
-          ySlot        <- if (advanced) emitCurrentStatement(xSlot) else xSlot.pureSP[F]
+          ySlot    <- if (advanced) emitCurrentStatement(xSlot) else xSlot.pureSP[F]
         } yield ySlot
 
     }
@@ -236,7 +243,8 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
       lazy val cond2 = n <= slot.ballotTracker.preparedPrime
 
       // if ballot is already covered by p, skip
-      lazy val cond3 = (n <= slot.ballotTracker.prepared) && n.compatible(slot.ballotTracker.prepared)
+      lazy val cond3 = (n <= slot.ballotTracker.prepared) && n.compatible(
+        slot.ballotTracker.prepared)
 
       // predict
       val votedPredict: Message.Statement.Predict = Message.Statement.predict {
@@ -416,7 +424,7 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
         modified <- slotService.hasAdvancedBallotProcess(slot, xSlot)
         ySlot <- if (modified) for {
           s0 <- updateCurrentIfNeeded(xSlot)
-          s1  <- emitCurrentStatement(s0)
+          s1 <- emitCurrentStatement(s0)
         } yield s1
         else xSlot.pureSP[F]
       } yield ySlot
@@ -558,6 +566,7 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
               for {
                 pre <- acc
                 qsOpt <- getQuorumSetFromStatement(
+                  slot,
                   slot.ballotTracker.latestBallotMessages(n).statement)
                 x <- if (qsOpt.isEmpty) pre.filter(_ != n).pureSP[F]
                 else
@@ -654,28 +663,36 @@ trait BallotProtocol[F[_]] extends BaseProtocol[F] {
       b1 <= b2 && !b1.compatible(b2)
     for {
       _ <- if (phase == Phase.Confirm && commit.isZero)
-        logService.error("when Phase.Confirm, commit should not be empty", Some("ballot")): SP[F, Unit]
+        logService.error("when Phase.Confirm, commit should not be empty", Some("ballot")): SP[F,
+                                                                                               Unit]
       else ().pureSP[F]
       _ <- if (phase == Phase.Externalized && (commit.isZero || high.isZero))
-        logService.error("when Phase.Confirm, commit and high should not be empty", Some("ballot")): SP[F, Unit]
+        logService.error("when Phase.Confirm, commit and high should not be empty", Some("ballot")): SP[
+          F,
+          Unit]
       else ().pureSP[F]
       _ <- if (current.counter <= 0)
         logService.error("current ballot's counter should <= 0", Some("ballot")): SP[F, Unit]
       else ().pureSP[F]
-      _ <- if (prepare.isNotZero && preparePrime.isNotZero && !areBallotsLessAndIncompatible(preparePrime, prepare))
-        logService.error("preparePrime should less than and incompatible to prepare", Some("ballot")): SP[F, Unit]
+      _ <- if (prepare.isNotZero && preparePrime.isNotZero && !areBallotsLessAndIncompatible(
+                 preparePrime,
+                 prepare))
+        logService.error("preparePrime should less than and incompatible to prepare",
+                         Some("ballot")): SP[F, Unit]
       else ().pureSP[F]
       _ <- if (commit.isNotZero && current.isZero)
-        logService.error("when commit is defined, current ballot should be empty", Some("ballot")): SP[F, Unit]
-      else ().pureSP[F]
-      _ <- if (commit.isNotZero && !areBallotsLessAndIncompatible(commit, high))
-        logService.error("when commit is defined, commit should less than and incompatible to high", Some("ballot")): SP[
+        logService.error("when commit is defined, current ballot should be empty", Some("ballot")): SP[
           F,
           Unit]
       else ().pureSP[F]
+      _ <- if (commit.isNotZero && !areBallotsLessAndIncompatible(commit, high))
+        logService.error("when commit is defined, commit should less than and incompatible to high",
+                         Some("ballot")): SP[F, Unit]
+      else ().pureSP[F]
       _ <- if (commit.isNotZero && !areBallotsLessAndIncompatible(high, current))
         logService.error(
-          "when commit is defined, high should less than and incompatible to current", Some("ballot")): SP[F, Unit]
+          "when commit is defined, high should less than and incompatible to current",
+          Some("ballot")): SP[F, Unit]
       else ().pureSP[F]
 
     } yield ()
