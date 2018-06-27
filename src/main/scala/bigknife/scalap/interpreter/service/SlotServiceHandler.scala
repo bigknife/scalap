@@ -273,12 +273,13 @@ class SlotServiceHandler extends SlotService.Handler[Stack] {
   }
 
   override def setNominatingValue(slot: Slot, values: Vector[Value], previousValue: Value): Stack[Slot] = Stack {
+    val newVotes = slot.nominateTracker.voted.filter(!values.contains(_)) ++ values
     slot.copy(
       nominateTracker = slot.nominateTracker.copy(
         nominationStarted = true,
         previousValue = Some(previousValue),
-        voted = slot.nominateTracker.voted ++ values,
-        roundNumber = if(values.isEmpty) slot.nominateTracker.roundNumber else slot.nominateTracker.roundNumber + 1
+        voted = newVotes/*,
+        roundNumber = if(values.isEmpty) slot.nominateTracker.roundNumber else slot.nominateTracker.roundNumber + 1 */
       )
     )
   }

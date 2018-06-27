@@ -24,12 +24,16 @@ trait NominationProtocol[F[_]] extends BaseProtocol[F] {
                             message: NominationMessage,
                             self: Boolean = false): SP[F, Result] = {
 
+    // if the slot found in store, but not the same, this is insane
     val verify: SP[F, Boolean] = for {
-      x <- isSane(message.statement)
-      _ <- logService.info(s"is sane? $x for $message")
-      y <- isNewer(slot, message.statement)
-      _ <- logService.info(s"is newer? $x for $message")
-    } yield x && y
+      storedSlotOpt <- slotStore.getSlotOfNode(slot.nodeId, slot.index)
+      x0            <- if (storedSlotOpt.isEmpty) true.pureSP[F] else (storedSlotOpt.get == slot).pureSP[F]
+      _             <- logService.info(s"is consistent with local store ? $x0")
+      x             <- isSane(message.statement)
+      _             <- logService.info(s"is sane? $x for $message")
+      y             <- isNewer(slot, message.statement)
+      _             <- logService.info(s"is newer? $x for $message")
+    } yield x0 && x && y
 
     def votedPredict(value: Value) = Message.Statement.predict {
       case x: Message.Nominate => x.votes.contains(value)
@@ -111,7 +115,8 @@ trait NominationProtocol[F[_]] extends BaseProtocol[F] {
                       case Validity.FullyValidated => Option(n).pureSP[F]
                       case _ =>
                         for {
-                          vOpt <- applicationExtension.extractValidValue(slot, n): SP[F, Option[Value]]
+                          vOpt <- applicationExtension.extractValidValue(slot, n): SP[F,
+                                                                                      Option[Value]]
                         } yield vOpt
                     }
                   }
@@ -166,11 +171,15 @@ trait NominationProtocol[F[_]] extends BaseProtocol[F] {
   def nominate(slot: Slot, value: Value, previousValue: Value, timeout: Boolean): SP[F, Boolean] = {
     def check(): SP[F, Boolean] =
       for {
+        // slot should be consistent with the local
+        localSlotOpt <- slotStore.getSlotOfNode(slot.nodeId, slot.index)
+        x0 <- if (localSlotOpt.isEmpty) true.pureSP[F] else (localSlotOpt.get == slot).pureSP[F]
+        _ <- logService.info(s"when nominating, is consistent with local store? $x0")
         x <- if (timeout && !slot.nominateTracker.nominationStarted)
           for {
             _ <- logService.info("nominate TIMED OUT")
             x <- false.pureSP[F]
-          } yield x
+          } yield x0 && x
         else true.pureSP[F]
       } yield x
 
@@ -184,34 +193,42 @@ trait NominationProtocol[F[_]] extends BaseProtocol[F] {
       }
     }
 
-    def getNewValueFromNomination(slot: Slot, nominationStatement: NominationStatement):SP[F, Option[Value]] = {
+    def getNewValueFromNomination(
+        slot: Slot,
+        nominationStatement: NominationStatement): SP[F, Option[Value]] = {
       nominationStatement match {
         case x: Message.Nominate =>
-          (x.votes ++ x.accepted).foldLeft((Option.empty[Value], 0L).pureSP[F]) {(acc, n) =>
-            for {
-              pre <- acc
-              vl <- applicationExtension.validateNominationValue(n)
-              vlOpt <- if (vl == Value.Validity.FullyValidated) Option(n).pureSP[F] else
-                applicationExtension.extractValidValue(slot, n): SP[F, Option[Value]]
-              x <- if (vlOpt.isDefined && !slot.nominateTracker.voted.contains(vlOpt.get)) {
-                for {
-                  curHash <- slotService.computeValueHash(slot, vlOpt.get): SP[F, Long]
-                } yield if(curHash >= pre._2) (vlOpt, curHash) else pre
-              } else acc
-            } yield x
-          }.map(_._1)
+          (x.votes ++ x.accepted)
+            .foldLeft((Option.empty[Value], 0L).pureSP[F]) { (acc, n) =>
+              for {
+                pre <- acc
+                vl  <- applicationExtension.validateNominationValue(n)
+                vlOpt <- if (vl == Value.Validity.FullyValidated) Option(n).pureSP[F]
+                else
+                  applicationExtension.extractValidValue(slot, n): SP[F, Option[Value]]
+                x <- if (vlOpt.isDefined && !slot.nominateTracker.voted.contains(vlOpt.get)) {
+                  for {
+                    curHash <- slotService.computeValueHash(slot, vlOpt.get): SP[F, Long]
+                  } yield if (curHash >= pre._2) (vlOpt, curHash) else pre
+                } else acc
+              } yield x
+            }
+            .map(_._1)
       }
     }
 
     def getNominatingValue(slot: Slot): SP[F, Vector[Value]] = {
       if (slot.nominateTracker.roundLeaders.contains(slot.nodeId)) Vector(value).pureSP[F]
       else {
-        val roundLeaders = slot.nominateTracker.roundLeaders.filter(slot.nominateTracker.latestNominations.contains)
+        val roundLeaders =
+          slot.nominateTracker.roundLeaders.filter(slot.nominateTracker.latestNominations.contains)
         roundLeaders.foldLeft(Vector.empty[Value].pureSP[F]) { (acc, n) =>
           for {
             pre <- acc
-            valueOpt <- getNewValueFromNomination(slot, slot.nominateTracker.latestNominations(n).statement)
-          } yield if(valueOpt.isDefined) pre :+ valueOpt.get else pre
+            valueOpt <- getNewValueFromNomination(
+              slot,
+              slot.nominateTracker.latestNominations(n).statement)
+          } yield if (valueOpt.isDefined) pre :+ valueOpt.get else pre
         }
       }
     }
@@ -225,9 +242,9 @@ trait NominationProtocol[F[_]] extends BaseProtocol[F] {
         .flatMap(_.validators)
         .foldLeft((Vector(slot.nodeId), Option.empty[Long]).pureSP[F]) { (acc, n) =>
           for {
-            res         <- acc
-            tp <- if (res._2.isEmpty) topPriority.pureSP[F] else res._2.get.pureSP[F]
-            w           <- nodeService.getNodePriority(slot, n, qs): SP[F, Long]
+            res <- acc
+            tp  <- if (res._2.isEmpty) topPriority.pureSP[F] else res._2.get.pureSP[F]
+            w   <- nodeService.getNodePriority(slot, n, qs): SP[F, Long]
             res <- if (w > tp) {
               (Vector.empty[Node.ID], Option(w)).pureSP[F]
             } else if (w == tp && w > 0) {
@@ -250,24 +267,24 @@ trait NominationProtocol[F[_]] extends BaseProtocol[F] {
     for {
       _ <- logService.info(
         s"nominate $value to Slot(${slot.index} at round ${slot.nominateTracker.roundNumber})")
-      _        <- slotStore.saveSlotForNode(slot.nodeId, slot)
+      //_      <- slotStore.saveSlotForNode(slot.nodeId, slot)
       passed <- check()
-      _ <- logService.info(s"check nominate: $passed")
+      _      <- logService.info(s"check nominate: $passed")
       m <- if (passed) for {
-        x0Slot <- slotService.startNewNominationRound(slot)
-        xSlot <- slotService.setNominatingValue(x0Slot, Vector(), previousValue)
-        ySlot <- updateRoundLeaders(xSlot)
-        nv    <- getNominatingValue(ySlot)
-        zSlot <- slotService.setNominatingValue(ySlot, nv, previousValue)
-        ts    <- applicationExtension.computeTimeoutForNomination(zSlot)
+        x0Slot   <- slotService.startNewNominationRound(slot)
+        xSlot    <- slotService.setNominatingValue(x0Slot, Vector(), previousValue)
+        ySlot    <- updateRoundLeaders(xSlot)
+        nv       <- getNominatingValue(ySlot)
+        zSlot    <- slotService.setNominatingValue(ySlot, nv, previousValue)
+        ts       <- applicationExtension.computeTimeoutForNomination(zSlot)
         modified <- slotService.hasBeenModifiedInNomination(zSlot, slot)
-        _ <- logService.info(s"slot(${slot.index}) has been modified: $modified")
-        z0Slot    <- if (modified) emitNomination(zSlot) else zSlot.pureSP[F]
+        _        <- logService.info(s"slot(${slot.index}) has been modified: $modified")
+        _        <- slotStore.saveSlotForNode(slot.nodeId, zSlot)
+        z0Slot   <- if (modified) emitNomination(zSlot) else zSlot.pureSP[F]
         _        <- slotStore.saveSlotForNode(slot.nodeId, z0Slot)
-        _ <- applicationExtension.setupTimer(
-          z0Slot,
-          ts,
-          ReNominateArgs(value, previousValue, timeout = true))
+        _ <- applicationExtension.setupTimer(z0Slot,
+                                             ts,
+                                             ReNominateArgs(value, previousValue, timeout = true))
       } yield modified
       else passed.pureSP[F]
     } yield m
@@ -288,7 +305,7 @@ trait NominationProtocol[F[_]] extends BaseProtocol[F] {
     * @return
     */
   private def isNewer(slot: Slot, statement: NominationStatement): SP[F, Boolean] = {
-    val savedNominationOpt = slot.nominateTracker.latestNominations.get(slot.nodeId)
+    val savedNominationOpt = slot.nominateTracker.latestNominations.get(statement.nodeId)
     if (savedNominationOpt.isEmpty) true.pureP[F]
     else {
       messageService.firstNominationStatementIsNewer(statement, savedNominationOpt.get.statement)
@@ -301,6 +318,7 @@ trait NominationProtocol[F[_]] extends BaseProtocol[F] {
       hash   <- quorumSetService.hashOfQuorumSet(qs)
       msg    <- messageService.createNominationMessage(slot, hash)
       _      <- logService.info(s"create new nomination message: $msg")
+      _      <- slotStore.saveSlotForNode(slot.nodeId, slot)
       result <- runNominationProtocol(slot, msg, self = true)
       _      <- logService.info(s"run nomination locally return $result")
       xSlot <- if (result._2 != Message.State.valid) result._1.pureSP[F]

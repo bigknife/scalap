@@ -53,7 +53,8 @@ class NodeServiceHandler extends NodeService.Handler[Stack] {
     val f5 = slot.nominateTracker.previousValue.get.asBytes
     val bytes = misc.crypto.sha3(f1 ++ f2 ++ f3++ f4 ++ f5)
     val l = new java.math.BigInteger(bytes).longValue()
-    asUnsignedLong(l)
+    //asUnsignedLong(l)
+    l
   }
 
   private def bigDivide(a: Long, b: Long, c: Long): Long = {
@@ -62,13 +63,14 @@ class NodeServiceHandler extends NodeService.Handler[Stack] {
     val c1 = BigDecimal(c)
 
     val l = ((a1 * b1) / c1).setScale(0, RoundingMode.UP).longValue()
-    asUnsignedLong(l)
+    //asUnsignedLong(l)
+    l
   }
 
   private def asUnsignedLong(l: Long): Long = {
-    //val bi = java.math.BigInteger.valueOf(l)
-    //if (bi.signum() < 0) bi.add(java.math.BigInteger.ONE.shiftLeft(64)).toString().toLong else l
-    l.abs
+    val bi = java.math.BigInteger.valueOf(l)
+    if (bi.signum() < 0) bi.add(java.math.BigInteger.ONE.shiftLeft(64)).toString().toLong else l
+    //l.abs
   }
 
   private def _bigDivide(a: Long, b: Long, c: Long): (Long, Boolean) = {
