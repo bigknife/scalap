@@ -21,10 +21,19 @@ trait Connect {
     * @return full/ maybe/ invalid
     */
   def validateValue(value: Value): Value.Validity
+
+  /**
+    * make a signature for data of a node
+    * @param bytes data
+    * @param nodeID node id
+    * @return
+    */
+  def signData(bytes: Array[Byte], nodeID: NodeID): Signature
 }
 
 object Connect {
   def dummy: Connect = new Connect {
+
     /**
       * try to extract a valid value from a not full validated value
       *
@@ -40,5 +49,14 @@ object Connect {
       * @return full/ maybe/ invalid
       */
     override def validateValue(value: Value): Value.Validity = Validity.fullyValidated
-}
+
+    /**
+      * make a signature for data of a node
+      *
+      * @param bytes  data
+      * @param nodeID node id
+      * @return
+      */
+    override def signData(bytes: Array[Byte], nodeID: NodeID): Signature = Signature.empty
+  }
 }

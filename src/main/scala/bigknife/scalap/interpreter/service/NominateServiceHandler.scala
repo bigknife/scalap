@@ -50,7 +50,7 @@ class NominateServiceHandler extends NominateService.Handler[Stack] {
           tracker.latestNominations
             .filter(x => leaders.contains(x._1))
             .values
-            .map(_.message)
+            .map(_.statement.message)
             .toVector
         val allValues: Vector[Value] =
           nominations.flatMap(x => x.voted.toVector ++ x.accepted.toVector)
@@ -86,6 +86,21 @@ class NominateServiceHandler extends NominateService.Handler[Stack] {
         } else BoolResult(tracker, successful = false)
       }
   }
+
+  override def createNominationEnvelope(nodeID: NodeID,
+                                        slotIndex: SlotIndex,
+                                        quorumSet: QuorumSet,
+                                        nomination: Nomination): Stack[Envelope[Nomination]] =
+    Stack { setting =>
+      val statement = Statement.Nominate(
+        nodeID,
+        slotIndex,
+        quorumSet.hash,
+        nomination
+      )
+      val signature: Signature = setting.connect.signData(statement.toBytes, nodeID)
+      Envelope(statement, signature)
+    }
 }
 
 object NominateServiceHandler {

@@ -33,4 +33,15 @@ import bigknife.sop.implicits._
                         nodeID: NodeID,
                         tryToNominate: Value,
                         leaders: Set[NodeID]): P[F, NominateNewValuesResult]
+
+  /**
+    * create a nomination envelope
+    * @param nodeID node, who create the envelope, use the node's public key could verify the envelope
+    * @param nomination nomination message
+    * @return
+    */
+  def createNominationEnvelope(nodeID: NodeID,
+                               slotIndex: SlotIndex,
+                               quorumSet: QuorumSet,
+                               nomination: Message.Nomination): P[F, Envelope[Message.Nomination]]
 }

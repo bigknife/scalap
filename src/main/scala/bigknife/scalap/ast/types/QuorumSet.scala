@@ -30,6 +30,8 @@ sealed trait QuorumSet {
 
   def neighbors(round: Int, slotIndex: SlotIndex, previousValue: Value): Set[NodeID] =
     QuorumSet.neighbors(this, round, slotIndex, previousValue)
+
+  lazy val hash: Hash = QuorumSet.hash(this)
 }
 object QuorumSet {
   case class Simple(
@@ -94,5 +96,35 @@ object QuorumSet {
       val w = nodeWeight(quorumSet, nodeID)
       util.gi(util.Gi.Mode.Mode_Neighbor, nodeID, round, slotIndex, previousValue) < w
     })
+  }
+
+  def hashSimple(simple: Simple): Hash =
+    Hash(
+      util.crypoto.sha3(
+        (simple.threshold.toString.getBytes.toVector ++
+          simple.validators
+          .map(_.asHex())
+          .toVector
+          .sorted
+          .flatMap(_.getBytes.toVector)).toArray
+
+  def hash(quorumSet: QuorumSet): Hash = {
+    quorumSet match {
+      case x: Simple => hashSimple(x)
+      case Nest(threshold, validators, innerSets) =>
+        Hash(
+          threshold.toString.getBytes ++ validators
+            .map(_.asHex())
+            .toVector
+            .sorted
+            .flatMap(_.getBytes.toVector)
+            .toArray ++ innerSets
+            .map(hashSimple)
+            .map(_.asHex())
+            .toVector
+            .sorted
+            .flatMap(_.getBytes.toVector)
+            .toArray)
+    }
   }
 }

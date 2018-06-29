@@ -12,4 +12,7 @@ package object types {
   }
 
   type NominateNewValuesResult = BoolResult[NominateTracker]
+  type NominationEnvelope = Envelope[Message.Nomination]
+  type NominationEnvelopeResult = BoolResult[NominationEnvelope]
+
 }

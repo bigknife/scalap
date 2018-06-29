@@ -9,7 +9,7 @@ import bigknife.sop.implicits._
   *
   */
 trait NominationProtocol[F[_]] {
-  val model: Model[Model.Op]
+  val model: Model[F]
   import model._
 
   /**
@@ -23,14 +23,20 @@ trait NominationProtocol[F[_]] {
   def nominate(nodeID: NodeID,
                slotIndex: SlotIndex,
                valueToNominate: Value,
-               previousValue: Value): SP[F, Unit] = {
+               previousValue: Value): SP[F, Boolean] = {
     // find the most high priority nodes as the leaders to follow their votes and accepted
 
     // find the tracker and update nominate tracker
 
     // then create an nomination message
+    def createNominationMessage(result: NominateNewValuesResult): SP[F, NominationEnvelopeResult] = {
+      if (result.successful) {
+
+      }
+    }
 
     // emit nomination message
+    def emitNominationMessage(msgResult: NominationEnvelopeResult): SP[F, Boolean] = ???
 
     for {
       quorumSet <- nodeStore.getQuorumSet(nodeID)
@@ -39,10 +45,16 @@ trait NominationProtocol[F[_]] {
                                                   tracker.round,
                                                   slotIndex,
                                                   previousValue)
-      result <- nominateService.nominateNewValues(tracker, nodeID, valueToNominate, leaders)
-
-    } yield ()
-
-    ???
+      trackerResult <- nominateService.nominateNewValues(tracker, nodeID, valueToNominate, leaders)
+      msgResult <- createNominationMessage(trackerResult)
+      res <- emitNominationMessage(msgResult)
+    } yield res
   }
+
+  /**
+    * handle the message when received from self or peers
+    * @param envelope message envelope
+    * @return
+    */
+  def processEnvelope(envelope: NominationEnvelope): SP[F, Envelope.State] = ???
 }
