@@ -15,4 +15,6 @@ object Envelope {
     def invalid: State = Invalid
   }
 
+  ////// smart constructors
+  def fakeNominate: Envelope[Message.Nomination] = Envelope(Statement.fakeNominate, Signature.empty)
 }

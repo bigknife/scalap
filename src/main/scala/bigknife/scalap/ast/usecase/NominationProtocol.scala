@@ -29,25 +29,51 @@ trait NominationProtocol[F[_]] {
     // find the tracker and update nominate tracker
 
     // then create an nomination message
-    def createNominationMessage(result: NominateNewValuesResult): SP[F, NominationEnvelopeResult] = {
+    def createNominationMessage(
+        nodeID: NodeID,
+        slotIndex: SlotIndex,
+        quorumSet: QuorumSet,
+        result: NominateNewValuesResult): SP[F, NominationEnvelopeResult] = {
       if (result.successful) {
-
-      }
+        for {
+          env <- nominateService.createNominationEnvelope(
+            nodeID,
+            slotIndex,
+            quorumSet,
+            result.data.nomination)
+        } yield BoolResult(env, successful = true)
+      } else BoolResult(Envelope.fakeNominate, successful = false).pureSP[F]
     }
 
     // emit nomination message
-    def emitNominationMessage(msgResult: NominationEnvelopeResult): SP[F, Boolean] = ???
+    def emitNominationMessage(
+        nodeID: NodeID,
+        tracker: NominateTracker,
+        msgResult: NominationEnvelopeResult): SP[F, Boolean] = {
+      if (msgResult.successful) {
+        for {
+          st <- processEnvelope(nodeID, msgResult.data)
+          _ <- nominateService.broadcastEnvelope(tracker, msgResult.data)
+        } yield true
+      } else false.pureSP[F]
+    }
 
     for {
       quorumSet <- nodeStore.getQuorumSet(nodeID)
-      tracker   <- nodeStore.getNominateTracker(nodeID, slotIndex)
+      tracker <- nodeStore.getNominateTracker(nodeID, slotIndex)
       leaders <- nominateService.findRoundLeaders(quorumSet,
                                                   tracker.round,
                                                   slotIndex,
                                                   previousValue)
-      trackerResult <- nominateService.nominateNewValues(tracker, nodeID, valueToNominate, leaders)
-      msgResult <- createNominationMessage(trackerResult)
-      res <- emitNominationMessage(msgResult)
+      trackerResult <- nominateService.nominateNewValues(tracker,
+                                                         nodeID,
+                                                         valueToNominate,
+                                                         leaders)
+      msgResult <- createNominationMessage(nodeID,
+                                           slotIndex,
+                                           quorumSet,
+                                           trackerResult)
+      res <- emitNominationMessage(nodeID, trackerResult.data, msgResult)
     } yield res
   }
 
@@ -56,5 +82,6 @@ trait NominationProtocol[F[_]] {
     * @param envelope message envelope
     * @return
     */
-  def processEnvelope(envelope: NominationEnvelope): SP[F, Envelope.State] = ???
+  def processEnvelope(nodeID: NodeID,
+                      envelope: NominationEnvelope): SP[F, Envelope.State] = ???
 }

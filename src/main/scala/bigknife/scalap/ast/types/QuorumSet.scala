@@ -98,33 +98,31 @@ object QuorumSet {
     })
   }
 
-  def hashSimple(simple: Simple): Hash =
-    Hash(
-      util.crypoto.sha3(
-        (simple.threshold.toString.getBytes.toVector ++
-          simple.validators
-          .map(_.asHex())
-          .toVector
-          .sorted
-          .flatMap(_.getBytes.toVector)).toArray
-
   def hash(quorumSet: QuorumSet): Hash = {
+    def hashSimple(simple: Simple): Hash =
+      Hash(
+        util.crypoto.sha3(
+          (simple.threshold.toString.getBytes.toVector ++
+            simple.validators
+              .map(_.asHex())
+              .toVector
+              .sorted
+              .flatMap(_.getBytes.toVector)).toArray))
+
     quorumSet match {
       case x: Simple => hashSimple(x)
       case Nest(threshold, validators, innerSets) =>
         Hash(
-          threshold.toString.getBytes ++ validators
+          (threshold.toString.getBytes.toVector ++ validators
             .map(_.asHex())
             .toVector
             .sorted
-            .flatMap(_.getBytes.toVector)
-            .toArray ++ innerSets
+            .flatMap(_.getBytes.toVector) ++ innerSets
             .map(hashSimple)
             .map(_.asHex())
             .toVector
             .sorted
-            .flatMap(_.getBytes.toVector)
-            .toArray)
+            .flatMap(_.getBytes.toVector)).toArray)
     }
   }
 }

@@ -44,4 +44,13 @@ import bigknife.sop.implicits._
                                slotIndex: SlotIndex,
                                quorumSet: QuorumSet,
                                nomination: Message.Nomination): P[F, Envelope[Message.Nomination]]
+
+  /**
+    * broadcast envelope to peers according to the conditions:
+    * 1. no nomination envelope had been broadcast on the node
+    * 2. nomination statement in the envelope is newer than last sent nomination envelope
+    * @param envelope envelope with nomination statement
+    * @return
+    */
+  def broadcastEnvelope(tracker: NominateTracker, envelope: Envelope[Message.Nomination]): P[F, NominateTracker]
 }

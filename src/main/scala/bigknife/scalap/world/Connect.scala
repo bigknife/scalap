@@ -29,6 +29,12 @@ trait Connect {
     * @return
     */
   def signData(bytes: Array[Byte], nodeID: NodeID): Signature
+
+  /**
+    * broadcast message
+    * @param envelope envelope
+    */
+  def broadcastMessage[M <: Message](envelope: Envelope[M]): Unit
 }
 
 object Connect {
@@ -58,5 +64,12 @@ object Connect {
       * @return
       */
     override def signData(bytes: Array[Byte], nodeID: NodeID): Signature = Signature.empty
+
+    /**
+      * broadcast message
+      *
+      * @param envelope envelope
+      */
+    override def broadcastMessage[M <: Message](envelope: Envelope[M]): Unit = ()
   }
 }

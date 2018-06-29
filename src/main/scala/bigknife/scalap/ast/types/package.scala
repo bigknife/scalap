@@ -9,6 +9,11 @@ package object types {
         acc + n
       }
     }
+
+    def toBytes(valueSet: ValueSet): Array[Byte] = {
+      val v: Vector[Array[Byte]] = valueSet.toVector.map(_.bytes)
+      v.foldLeft(Array.emptyByteArray) {_ ++ _}
+    }
   }
 
   type NominateNewValuesResult = BoolResult[NominateTracker]
