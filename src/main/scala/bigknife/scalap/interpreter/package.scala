@@ -3,9 +3,6 @@ package bigknife.scalap
 import cats.data.Kleisli
 import cats.effect.IO
 
-import interpreter.service._
-import interpreter.store._
-
 package object interpreter {
 
   type Stack[A] = Kleisli[IO, Setting, A]

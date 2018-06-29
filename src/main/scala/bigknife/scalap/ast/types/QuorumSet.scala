@@ -1,44 +1,98 @@
-package bigknife.scalap.ast.types
+package bigknife.scalap
+package ast.types
 
-case class QuorumSet(
-    threshold: Int, // at least threshold members should say yes.
-    validators: Vector[Node.ID], // a quorum slice to convince a node to believe something.
-    innerSets: Vector[QuorumSet] = Vector.empty // nesting inner quorum sets. (only allows 2 levels of nesting)
-) {
+import java.nio.ByteBuffer
 
-  def withThreshold(threshold: Int): QuorumSet               = copy(threshold = threshold)
-  def withValidators(validators: Vector[Node.ID]): QuorumSet = copy(validators = validators)
-  def withInnerSets(innerSets: Vector[QuorumSet]): QuorumSet = copy(innerSets = innerSets)
+/**
+  * quorum slices k-of-n, threshold is K, and size is N
+  */
+sealed trait QuorumSet {
+  def threshold: Int
+  def size: Int
 
-  def addValidator(validator: Node.ID): QuorumSet  = copy(validators = this.validators :+ validator)
-  def addInnerSet(quorumSet: QuorumSet): QuorumSet = copy(innerSets = this.innerSets :+ quorumSet)
+  /**
+    * nest a new quorum set
+    * @param threshold threshold
+    * @param nodeIds node ids
+    * @return
+    */
+  def nest(threshold: Int, nodeIds: NodeID*): QuorumSet =
+    QuorumSet.nest(this, threshold, nodeIds: _*)
 
-  override def toString: String = {
-    val validatorsStr =
-      validators.map(x => x.value.take(3).map("%02x" format _).mkString("")).mkString(",")
+  /**
+    * compute a node weight in this quorumset
+    * @param nodeID node id
+    * @return weight
+    */
+  def nodeWeight(nodeID: NodeID): Long = QuorumSet.nodeWeight(this, nodeID)
 
-    if (innerSets.isEmpty) {
-      s"QS($threshold,Validators($validatorsStr)"
-    } else {
-      val innerSetsStr = innerSets.map(_.toString).mkString(",")
-      s"QS($threshold,Validators($validatorsStr),Inner($innerSetsStr))"
+  def allNodes: Set[NodeID] = QuorumSet.allNodes(this)
+
+  def neighbors(round: Int, slotIndex: SlotIndex, previousValue: Value): Set[NodeID] =
+    QuorumSet.neighbors(this, round, slotIndex, previousValue)
+}
+object QuorumSet {
+  case class Simple(
+      threshold: Int,
+      validators: Set[NodeID]
+  ) extends QuorumSet {
+    override def size: Int = validators.size
+  }
+  case class Nest(
+      threshold: Int,
+      validators: Set[NodeID],
+      innerSets: Set[Simple]
+  ) extends QuorumSet {
+    override def size: Int = validators.size + innerSets.size
+  }
+
+  def simple(threshold: Int, nodeIds: NodeID*): QuorumSet =
+    Simple(threshold, nodeIds.toSet)
+
+  def nest(quorumSet: QuorumSet, threshold: Int, nodeIds: NodeID*): QuorumSet = quorumSet match {
+    case Simple(_threshold, validators) =>
+      Nest(_threshold, validators, Set(simple(threshold, nodeIds: _*).asInstanceOf[Simple]))
+    case x: Nest =>
+      x.copy(innerSets = x.innerSets + simple(threshold, nodeIds: _*).asInstanceOf[Simple])
+  }
+
+  def nodeWeight(quorumSet: QuorumSet, nodeID: NodeID): Long = {
+    quorumSet match {
+      case x @ Simple(threshold, validators) =>
+        if (validators.contains(nodeID)) {
+          (BigInt(Long.MaxValue) * BigInt(threshold) / BigInt(x.size)).toLong
+        } else 0L
+
+      case x @ Nest(threshold, validators, innerSets) =>
+        if (validators.contains(nodeID)) {
+          (BigInt(Long.MaxValue) * BigInt(threshold) / BigInt(x.size)).toLong
+        } else {
+          innerSets
+            .find(_.validators.contains(nodeID))
+            .map { qs =>
+              val leafW = nodeWeight(qs, nodeID)
+              (BigInt(leafW) * BigInt(threshold) / BigInt(x.size)).toLong
+            }
+            .getOrElse(0)
+        }
     }
   }
 
-  /*
-  override def equals(obj: scala.Any): Boolean = obj match {
-    case that: QuorumSet =>
-      this.threshold == that.threshold &&
-      this.validators == that.validators &&
-      this.innerSets == that.innerSets
-    case _ => false
-  }*/
-}
+  def allNodes(quorumSet: QuorumSet): Set[NodeID] = quorumSet match {
+    case Simple(_, validators) => validators
+    case Nest(_, validators, innerSets) =>
+      validators ++ innerSets.foldLeft(Set.empty[NodeID]) { (acc, n) =>
+        acc ++ n.validators
+      }
+  }
 
-object QuorumSet {
-  val Empty: QuorumSet = QuorumSet(
-    0,
-    Vector.empty,
-    Vector.empty
-  )
+  def neighbors(quorumSet: QuorumSet,
+                round: Int,
+                slotIndex: SlotIndex,
+                previousValue: Value): Set[NodeID] = {
+    allNodes(quorumSet).filter({ nodeID =>
+      val w = nodeWeight(quorumSet, nodeID)
+      util.gi(util.Gi.Mode.Mode_Neighbor, nodeID, round, slotIndex, previousValue) < w
+    })
+  }
 }
