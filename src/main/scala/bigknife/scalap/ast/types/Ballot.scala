@@ -17,5 +17,5 @@ case class Ballot(counter: Int, value: Value) extends Ordered[Ballot] {
 }
 
 object Ballot {
-  val Null: Ballot = Ballot(0, Value.empty)
+  val Null: Ballot = Ballot(0, Value.bottom)
 }

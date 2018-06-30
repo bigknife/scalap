@@ -2,13 +2,33 @@ package bigknife.scalap.ast.types
 
 /**
   * value, whatever data, represented by opaque bytes
-  * @param bytes bytes
   */
-case class Value(bytes: Array[Byte]) extends OpaqueBytes
+trait Value extends OpaqueBytes with Ordered[Value] {}
 
 object Value {
+  private object BottomValue extends Value {
+    override def compare(that: Value): Int = if (that == this) 0 else -1
+    override def bytes: Array[Byte]        = Array.emptyByteArray
+  }
 
-  def empty: Value = Value(Array.emptyByteArray)
+  private case class SimpleValue(data: Array[Byte]) extends Value {
+    override def compare(that: Value): Int = that match {
+      case BottomValue => 1
+      case SimpleValue(dataThat) =>
+        val thisStr = data.map("%02x" format _).mkString("")
+        val thatStr = dataThat.map("%02x" format _).mkString("")
+        thisStr.compareTo(thatStr)
+
+      case _ => -1
+    }
+
+    override def bytes: Array[Byte] = data
+  }
+
+  def bottom: Value = BottomValue
+
+  def simple(data: Array[Byte]): Value = SimpleValue(data)
+  def apply(data: Array[Byte]): Value = simple(data)
 
   trait Validity
   object Validity {
@@ -23,7 +43,7 @@ object Value {
     }
 
     def fullyValidated: Validity = FullyValidated
-    def invalid: Validity = Invalid
-    def maybeValid: Validity = MaybeValid
+    def invalid: Validity        = Invalid
+    def maybeValid: Validity     = MaybeValid
   }
 }

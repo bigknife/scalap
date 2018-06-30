@@ -30,7 +30,7 @@ class NominateServiceHandlerSpec extends FunSuite with GivenWhenThen {
       Given(s"round = $i, slotIndex = 1, previousValue = Value(hello,world)")
       val round: Int = i
       val slotIndex: SlotIndex = SlotIndex(1)
-      val previousValue: Value = Value("hello,world".getBytes())
+      val previousValue: Value = Value.simple("hello,world".getBytes())
 
       When("find round leaders")
       val leaders = nominateServiceHandler

@@ -56,7 +56,7 @@ object Message {
       def isSane(): Boolean = message match {
         case Nomination(voted, accepted) =>
           !(voted.isEmpty && accepted.isEmpty)
-          // 
+          //
         case _ => false //todo developing...
       }
     }
