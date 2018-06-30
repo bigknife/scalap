@@ -10,6 +10,15 @@ object Message {
       accepted: ValueSet
   ) extends Message
 
+  case class Prepare(
+      ballot: Ballot,
+      prepare: Ballot,
+      preparePrime: Ballot,
+      hCounter: Int,
+      cCounter: Int
+  ) extends Message
+
+
   class NominationBuilder {
     private val voted: collection.mutable.ListBuffer[Value]    = collection.mutable.ListBuffer.empty
     private val accepted: collection.mutable.ListBuffer[Value] = collection.mutable.ListBuffer.empty
@@ -40,4 +49,16 @@ object Message {
   }
 
   def nominationBuilder(): NominationBuilder = new NominationBuilder
+
+  /////// message ops
+  trait Ops {
+    implicit final class MessageOps(message: Message) {
+      def isSane(): Boolean = message match {
+        case Nomination(voted, accepted) =>
+          !(voted.isEmpty && accepted.isEmpty)
+          // 
+        case _ => false //todo developing...
+      }
+    }
+  }
 }

@@ -7,6 +7,9 @@ package bigknife.scalap.ast.types
 case class Value(bytes: Array[Byte]) extends OpaqueBytes
 
 object Value {
+
+  def empty: Value = Value(Array.emptyByteArray)
+
   trait Validity
   object Validity {
     case object FullyValidated extends Validity {
