@@ -10,6 +10,8 @@ package object types {
       }
     }
 
+    def empty: ValueSet = apply()
+
     def toBytes(valueSet: ValueSet): Array[Byte] = {
       val v: Vector[Array[Byte]] = valueSet.toVector.map(_.bytes)
       v.foldLeft(Array.emptyByteArray) {_ ++ _}
@@ -19,5 +21,10 @@ package object types {
   type NominateNewValuesResult = BoolResult[NominateTracker]
   type NominationEnvelope = Envelope[Message.Nomination]
   type NominationEnvelopeResult = BoolResult[NominationEnvelope]
+
+  type NominationStatement = Statement[Message.Nomination]
+
+  type Predicate[A] = A => Boolean
+  type StatementPredicate[M <: Message] = Predicate[Statement[M]]
 
 }

@@ -35,6 +35,20 @@ trait Connect {
     * @param envelope envelope
     */
   def broadcastMessage[M <: Message](envelope: Envelope[M]): Unit
+
+  /**
+    * verify signature of an envelope
+    * @param envelope envelope
+    * @return
+    */
+  def verifySignature[M <: Message](envelope: Envelope[M]): Boolean
+
+  /**
+    * combine value set to one value
+    * @param valueSet values
+    * @return
+    */
+  def combineValues(valueSet: ValueSet): Value
 }
 
 object Connect {
@@ -71,5 +85,21 @@ object Connect {
       * @param envelope envelope
       */
     override def broadcastMessage[M <: Message](envelope: Envelope[M]): Unit = ()
+
+    /**
+      * verify signature of an envelope
+      *
+      * @param envelope envelope
+      * @return
+      */
+    override def verifySignature[M <: Message](envelope: Envelope[M]): Boolean = true
+
+    /**
+      * combine value set to one value
+      *
+      * @param valueSet values
+      * @return
+      */
+    override def combineValues(valueSet: ValueSet): Value = valueSet.unsafeHeadValue()
   }
 }

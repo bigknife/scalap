@@ -32,6 +32,20 @@ sealed trait QuorumSet {
     QuorumSet.neighbors(this, round, slotIndex, previousValue)
 
   lazy val hash: Hash = QuorumSet.hash(this)
+
+  /**
+    * compute if the nodeIDs is current quorumset's vblocking set
+    * @param nodeIDs nodes
+    * @return
+    */
+  def isVBlocking(nodeIDs: Set[NodeID]): Boolean = QuorumSet.isVBlocking(this, nodeIDs)
+
+  /**
+    * compute if the nodeIDs is current quorumset's quorum slice
+    * @param nodeIDs nodes
+    * @return
+    */
+  def isQuorumSlice(nodeIDs: Set[NodeID]): Boolean = QuorumSet.isQuorumSlice(this, nodeIDs)
 }
 object QuorumSet {
   case class Simple(
@@ -124,5 +138,40 @@ object QuorumSet {
             .sorted
             .flatMap(_.getBytes.toVector)).toArray)
     }
+  }
+
+  def isVBlocking(quorumSet: QuorumSet, nodeIDs: Set[NodeID]): Boolean = {
+    if (quorumSet.threshold == 0) false
+    else {
+      val leftTillBlock = quorumSet.size - quorumSet.threshold + 1
+      quorumSet match {
+        case Simple(_, validators) =>
+          validators.count(nodeIDs.contains) >= leftTillBlock
+        case Nest(_, validators, innerSets) =>
+          val rest = leftTillBlock - validators.count(nodeIDs.contains)
+          if (rest <= 0) true
+          else {
+            val c = innerSets.foldLeft(0) { (acc, n) =>
+              val vb = isVBlocking(n, nodeIDs)
+              if (vb) acc + 1 else acc
+            }
+            rest - c <= 0
+          }
+      }
+    }
+  }
+
+  def isQuorumSlice(quorumSet: QuorumSet, nodeIDs: Set[NodeID]): Boolean = quorumSet match {
+    case Simple(threshold, validators) =>
+      validators.count(nodeIDs.contains) >= threshold
+    case Nest(threshold, validators, innerSets) =>
+      val rest = threshold - validators.count(nodeIDs.contains)
+      if (rest <= 0) true
+      else {
+        val c = innerSets.foldLeft(0) {(acc, n) =>
+          if (isQuorumSlice(n, nodeIDs)) acc + 1 else acc
+        }
+        rest - c <= 0
+      }
   }
 }

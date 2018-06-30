@@ -29,10 +29,19 @@ import bigknife.sop.implicits._
     * @param leaders the nodeId's quorumset's leaders on current round(tracker.round)
     * @return result, if the tracker updated return (new tracker, true) else (old tracker, false)
     */
-  def nominateNewValues(tracker: NominateTracker,
-                        nodeID: NodeID,
-                        tryToNominate: Value,
-                        leaders: Set[NodeID]): P[F, NominateNewValuesResult]
+  def nominateNewValuesWithLeaders(tracker: NominateTracker,
+                                   nodeID: NodeID,
+                                   tryToNominate: Value,
+                                   leaders: Set[NodeID]): P[F, NominateNewValuesResult]
+
+  /**
+    * resolve value from nomination message
+    * @param tracker nomination tracker
+    * @param nom nomination message
+    * @return
+    */
+  def getNewValueFromNomination(tracker: NominateTracker,
+                                nom: Message.Nomination): P[F, Option[Value]]
 
   /**
     * create a nomination envelope
@@ -52,5 +61,36 @@ import bigknife.sop.implicits._
     * @param envelope envelope with nomination statement
     * @return
     */
-  def broadcastEnvelope(tracker: NominateTracker, envelope: Envelope[Message.Nomination]): P[F, NominateTracker]
+  def broadcastEnvelope(tracker: NominateTracker,
+                        envelope: Envelope[Message.Nomination]): P[F, NominateTracker]
+
+  /**
+    * record envelope for the tracker
+    * @param tracker nomination tracker
+    * @param envelope envelope
+    * @return
+    */
+  def recordEnvelope(tracker: NominateTracker,
+                     envelope: Envelope[Message.Nomination]): P[F, NominateTracker]
+
+  /**
+    * verify envelope's signature
+    * @param envelope envelope
+    * @return
+    */
+  def verifyEnvelopeSignature[M <: Message](envelope: Envelope[M]): P[F, Boolean]
+
+  /**
+    * validate the value is legal on the application level
+    * @param value value
+    * @return
+    */
+  def validateValue(value: Value): P[F, Boolean]
+
+  /**
+    * combine value sets to one value
+    * @param valueSet values
+    * @return
+    */
+  def combineValues(valueSet: ValueSet): P[F, Value]
 }

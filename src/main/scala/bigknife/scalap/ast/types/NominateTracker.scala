@@ -7,8 +7,10 @@ case class NominateTracker(
     nodeID: NodeID,
     slotIndex: SlotIndex,
     round: Int,
+    roundLeaders: Set[NodeID],
     previousValue: Value,
     nomination: Message.Nomination,
+    candidates: ValueSet,
     latestNominations: Map[NodeID, Envelope[Message.Nomination]],
     lastSentEnvelope: Option[Envelope[Message.Nomination]]
 ) {
