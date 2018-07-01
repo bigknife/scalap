@@ -6,10 +6,11 @@ import ast.service._
 import bigknife.scalap.ast.types.{Ballot, BallotTracker, Value}
 
 class BallotServiceHandler extends BallotService.Handler[Stack] {
-  override def newBallot(tracker: BallotTracker, value: Value, counter: Int): Stack[Ballot] =
+  override def newBallot(tracker: BallotTracker, value: Value): Stack[Ballot] =
     Stack {
-      if (tracker.highBallotNotNull) Ballot(counter, tracker.high.value)
-      else Ballot(counter, value)
+      // if we have committed something, only bump the counter
+      if (tracker.highBallotNotNull) Ballot(tracker.high.counter + 1, tracker.high.value)
+      else Ballot(1, value)
     }
 }
 

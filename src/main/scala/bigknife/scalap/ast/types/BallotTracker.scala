@@ -10,7 +10,8 @@ case class BallotTracker(
     high: Ballot, // h, highest confirmed ballot.counter, if is 0, no confirmed
     commit: Ballot, // c, lowest confirmed ballot.counter
     latestBallotEnvelope: Map[NodeID, Envelope[Message.BallotMessage]], // M
-    lastSentEnvelope: Option[Envelope[Message.BallotMessage]]
+    lastSentEnvelope: Option[Envelope[Message.BallotMessage]],
+    heardFromQuorum: Boolean
 ) {
   def currentBallotIsNull: Boolean = current.isNull
   def currentBallotNotNull: Boolean = current.notNull
@@ -28,6 +29,7 @@ case class BallotTracker(
   def commitBallotNotNull: Boolean = commit.notNull
 
   def isExternalizePhrase: Boolean = phrase.isExternalize
+  def notExternalizePhrase: Boolean = ! phrase.isExternalize
 }
 
 object BallotTracker {

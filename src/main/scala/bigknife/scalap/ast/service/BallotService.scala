@@ -13,8 +13,7 @@ import bigknife.sop.implicits._
     * if tracker's high ballot is not empty, the coming value is ignored
     * @param tracker tracker
     * @param value coming value
-    * @param counter counter
     * @return
     */
-  def newBallot(tracker: BallotTracker, value: Value, counter: Int): P[F, Ballot]
+  def newBallot(tracker: BallotTracker, value: Value): P[F, Ballot]
 }

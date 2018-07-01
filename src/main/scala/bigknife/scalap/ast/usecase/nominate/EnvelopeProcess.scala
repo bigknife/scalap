@@ -1,12 +1,12 @@
 package bigknife.scalap.ast.usecase.nominate
 
-import bigknife.scalap.ast.types.{BoolResult, Envelope, NodeID, NominationEnvelope}
-import bigknife.scalap.ast.usecase.ModelSupport
+import bigknife.scalap.ast.types._
+import bigknife.scalap.ast.usecase.{ConvenienceSupport, ModelSupport}
 import bigknife.sop._
 import bigknife.sop.implicits._
 
 trait EnvelopeProcess[F[_]] extends NominationCore[F] {
-  self: EnvelopeProcessHelper[F] with ModelSupport[F] =>
+  self: EnvelopeProcessHelper[F] with ModelSupport[F] with ConvenienceSupport[F] =>
 
   import model._
 
@@ -31,21 +31,24 @@ trait EnvelopeProcess[F[_]] extends NominationCore[F] {
           valid                  <- self.validateNomination(nodeID, slotIndex, reduced)
           promoteAccept          <- self.promoteVotesToAccepted(trackerWithNewEnvelope, qSet, valid.voted)
           promoteCandidate       <- self.promoteAcceptedToCandidates(promoteAccept, qSet, valid.accepted)
-          takenRoundLeadersOnDemand <- self.takeRoundLeadersVotesOnDemand(promoteCandidate, envelope.statement)
-          promotedAccept         <- self.acceptedHasPromoted(tracker, takenRoundLeadersOnDemand)
-          promotedCandidate      <- self.candidatesHasPromoted(tracker, takenRoundLeadersOnDemand)
-          emitted <- if (promotedAccept) for {
-            env <- nominateService.createNominationEnvelope(nodeID,
-                                                            slotIndex,
-                                                            qSet,
-                                                            promoteCandidate.nomination)
-            emit <- emitNominationMessage(nodeID,
-                                          promoteCandidate,
-                                          BoolResult(env, successful = true))
-          } yield emit
-          else promoteCandidate.pureSP[F]
-          bumped <- if (promotedCandidate) bumpBallotState(emitted) else emitted.pureSP[F]
-          _      <- nodeStore.saveNominateTracker(nodeID, bumped)
+          takenRoundLeadersOnDemand <- self.takeRoundLeadersVotesOnDemand(promoteCandidate,
+                                                                          envelope.statement)
+          promotedAccept    <- self.acceptedHasPromoted(tracker, takenRoundLeadersOnDemand)
+          promotedCandidate <- self.candidatesHasPromoted(tracker, takenRoundLeadersOnDemand)
+          emitted <- ifM[NominateTracker](promoteCandidate, _ => promotedAccept) { _ =>
+            for {
+              env <- nominateService.createNominationEnvelope(nodeID,
+                                                              slotIndex,
+                                                              qSet,
+                                                              promoteCandidate.nomination)
+              emit <- emitNominationMessage(nodeID,
+                                            promoteCandidate,
+                                            BoolResult(env, successful = true))
+            } yield emit
+          }
+          bumped <- ifM[NominateTracker](emitted, _ => promotedCandidate)(_ =>
+            bumpBallotState(nodeID, slotIndex, emitted))
+          _ <- nodeStore.saveNominateTracker(nodeID, bumped)
         } yield Envelope.State.valid
     } yield state
   }

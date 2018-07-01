@@ -14,5 +14,6 @@ object component {
     val logService: LogService[F]
     val nominateService: NominateService[F]
     val nodeStore: NodeStore[F]
+    val ballotService: BallotService[F]
   }
 }

@@ -1,11 +1,11 @@
 package bigknife.scalap.ast.usecase.nominate
 
 import bigknife.scalap.ast.types._
-import bigknife.scalap.ast.usecase.{BaseHelper, ModelSupport}
+import bigknife.scalap.ast.usecase.{NominateBaseHelper, ModelSupport}
 import bigknife.sop._
 import bigknife.sop.implicits._
 
-trait NominateHelper[F[_]] extends BaseHelper[F]{
+trait NominateHelper[F[_]] extends NominateBaseHelper[F]{
   self: NominationCore[F] with ModelSupport[F] =>
 
   import self.model._

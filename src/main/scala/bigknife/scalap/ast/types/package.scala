@@ -32,4 +32,5 @@ package object types {
   val ballotPhraseConfirm: BallotPhrase     = BallotTracker.Phrase.Confirm
   val ballotPhraseExternalize: BallotPhrase = BallotTracker.Phrase.Externalize
 
+  object implicits extends Delta.Syntax
 }

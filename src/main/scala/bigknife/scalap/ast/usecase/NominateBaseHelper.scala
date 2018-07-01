@@ -5,7 +5,7 @@ import bigknife.scalap.ast.usecase.nominate.NominationCore
 import bigknife.sop._
 import bigknife.sop.implicits._
 
-trait BaseHelper[F[_]] {
+trait NominateBaseHelper[F[_]] {
   self: NominationCore[F] with ModelSupport[F] =>
   import model._
 
