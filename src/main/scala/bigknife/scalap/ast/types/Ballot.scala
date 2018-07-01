@@ -9,6 +9,7 @@ case class Ballot(counter: Int, value: Value) extends Ordered[Ballot] {
   }
 
   def isNull: Boolean = this == Ballot.Null
+  def notNull: Boolean = !isNull
 
   def compatible(that: Ballot): Boolean          = this.value == that.value
   def incompatible(that: Ballot): Boolean        = this.value != that.value

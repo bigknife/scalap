@@ -5,7 +5,7 @@ package object types {
   object ValueSet {
     def apply(values: Value*): ValueSet = {
       val empty = LinkedHashSet.empty[Value]("Values")
-      values.foldLeft(empty) {(acc, n) =>
+      values.foldLeft(empty) { (acc, n) =>
         acc + n
       }
     }
@@ -14,17 +14,22 @@ package object types {
 
     def toBytes(valueSet: ValueSet): Array[Byte] = {
       val v: Vector[Array[Byte]] = valueSet.toVector.map(_.bytes)
-      v.foldLeft(Array.emptyByteArray) {_ ++ _}
+      v.foldLeft(Array.emptyByteArray) { _ ++ _ }
     }
   }
 
-  type NominateNewValuesResult = BoolResult[NominateTracker]
-  type NominationEnvelope = Envelope[Message.Nomination]
+  type NominateNewValuesResult  = BoolResult[NominateTracker]
+  type NominationEnvelope       = Envelope[Message.Nomination]
   type NominationEnvelopeResult = BoolResult[NominationEnvelope]
 
   type NominationStatement = Statement[Message.Nomination]
 
-  type Predicate[A] = A => Boolean
+  type Predicate[A]                     = A => Boolean
   type StatementPredicate[M <: Message] = Predicate[Statement[M]]
+
+  type BallotPhrase = BallotTracker.Phrase
+  val ballotPhrasePrepare: BallotPhrase     = BallotTracker.Phrase.Prepare
+  val ballotPhraseConfirm: BallotPhrase     = BallotTracker.Phrase.Confirm
+  val ballotPhraseExternalize: BallotPhrase = BallotTracker.Phrase.Externalize
 
 }

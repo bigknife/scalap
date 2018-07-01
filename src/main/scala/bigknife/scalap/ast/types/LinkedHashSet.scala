@@ -26,6 +26,8 @@ sealed trait LinkedHashSet[A] {
   def hasGrownFrom(that: LinkedHashSet[A]): Boolean = LinkedHashSet.hasGrown(that, this)
 
   def unsafeHeadValue(): A
+
+  def sliding(count: Int): Iterator[Seq[A]]
 }
 
 object LinkedHashSet {
@@ -46,6 +48,8 @@ object LinkedHashSet {
     override def isEmpty: Boolean = data.isEmpty
 
     override def unsafeHeadValue(): A = data.head
+
+    override def sliding(count: Int): Iterator[Seq[A]] = data.sliding(count)
   }
 
   def empty[A](tag: String): LinkedHashSet[A] = SimpleLHS(Vector.empty, tag)
@@ -55,7 +59,7 @@ object LinkedHashSet {
   }
 
   def remove[A](lhs: LinkedHashSet[A], a: A): LinkedHashSet[A] = lhs match {
-    case _ @ (SimpleLHS(data, tag)) => SimpleLHS(data.filter(_ != a), tag)
+    case _ @ SimpleLHS(data, tag) => SimpleLHS(data.filter(_ != a), tag)
   }
 
   /**

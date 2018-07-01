@@ -16,8 +16,7 @@ object Message {
       preparePrime: Ballot,
       hCounter: Int,
       cCounter: Int
-  ) extends Message
-
+  ) extends BallotMessage
 
   class NominationBuilder {
     private val voted: collection.mutable.ListBuffer[Value]    = collection.mutable.ListBuffer.empty
@@ -53,11 +52,26 @@ object Message {
   /////// message ops
   trait Ops {
     implicit final class MessageOps(message: Message) {
-      def isSane(): Boolean = message match {
+      private def isAsc(values: ValueSet): Boolean =
+        values.sliding(2).exists {
+          case Seq()     => true
+          case Seq(_)    => true
+          case Seq(l, r) => l <= r
+        }
+      def isSane: Boolean = message match {
         case Nomination(voted, accepted) =>
-          !(voted.isEmpty && accepted.isEmpty)
-          //
-        case _ => false //todo developing...
+          // values of voted and accepted should ordered ASC
+          !(voted.isEmpty && accepted.isEmpty) && isAsc(voted) && isAsc(accepted)
+
+        case Prepare(ballot, prepare, preparePrime, hCounter, cCounter) =>
+          val cond1 = ballot.notNull
+          val cond2 = if (prepare.notNull) {
+            prepare <= ballot
+          } else true
+          val cond3 = if (preparePrime.notNull) {
+            prepare.notNull && preparePrime < prepare && (cCounter <= hCounter && hCounter <= ballot.counter)
+          } else true
+          cond1 && cond2 && cond3
       }
     }
   }

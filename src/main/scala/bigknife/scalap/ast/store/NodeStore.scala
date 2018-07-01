@@ -7,6 +7,8 @@ import bigknife.sop.macros._
 
 @sp trait NodeStore[F[_]] {
   def getNominateTracker(nodeID: NodeID, slotIndex: SlotIndex): P[F, NominateTracker]
+  def getBallotTracker(nodeID: NodeID, slotIndex: SlotIndex): P[F, BallotTracker]
+
   def getQuorumSet(nodeID: NodeID): P[F, QuorumSet]
 
   /**
@@ -15,6 +17,9 @@ import bigknife.sop.macros._
     * @return
     */
   def getQuorumSetFromStatement[M <: Message](statement: Statement[M]): P[F, QuorumSet]
+
   def saveNominateTracker(nodeID: NodeID, nominateTracker: NominateTracker): P[F, Unit]
+  def saveBallotTracker(nodeID: NodeID, ballotTracker: BallotTracker): P[F, Unit]
+
   def saveHistoricalStatement[M <: Message](statement: Statement[M]): P[F,Unit]
 }
