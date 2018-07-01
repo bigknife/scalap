@@ -16,4 +16,26 @@ import bigknife.sop.implicits._
     * @return
     */
   def newBallot(tracker: BallotTracker, value: Value): P[F, Ballot]
+
+  /**
+    * compute timeout in millisecond
+    * @param tracker tracer.
+    * @return
+    */
+  def computeBallotTimeout(tracker: BallotTracker): P[F, Long]
+
+  /**
+    * start ballot timer
+    * @param nodeID node id
+    * @param slotIndex slot index
+    */
+  def startBallotTimer(nodeID: NodeID, slotIndex: SlotIndex, timeout: Long): P[F, Unit]
+
+  /**
+    * stop ballot timer
+    * @param nodeID node id
+    * @param slotIndex slot index
+    * @return
+    */
+  def stopBallotTimer(nodeID: NodeID, slotIndex: SlotIndex): P[F, Unit]
 }

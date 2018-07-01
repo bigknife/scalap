@@ -2,12 +2,12 @@ package bigknife.scalap.ast.usecase.nominate
 
 import bigknife.scalap.ast.types._
 import bigknife.scalap.ast.usecase.ballot.BallotCore
-import bigknife.scalap.ast.usecase.{NominateBaseHelper, ModelSupport}
+import bigknife.scalap.ast.usecase.{ConvenienceSupport, ModelSupport, NominateBaseHelper}
 import bigknife.sop._
 import bigknife.sop.implicits._
 
 trait EnvelopeProcessHelper[F[_]] extends NominateBaseHelper[F] {
-  self: NominationCore[F] with ModelSupport[F] with BallotCore[F] =>
+  self: NominationCore[F] with ModelSupport[F] with ConvenienceSupport[F] with BallotCore[F] =>
 
   import model._
 
@@ -123,7 +123,7 @@ trait EnvelopeProcessHelper[F[_]] extends NominateBaseHelper[F] {
                                             quorumSet: QuorumSet,
                                             accepted: ValueSet): SP[F, NominateTracker] = {
     def acceptPredicate(v: Value): StatementPredicate[Message.Nomination] = {
-      (nom: NominationStatement) =>
+      nom: NominationStatement =>
         nom.message.accepted.contain(v)
     }
 
@@ -153,10 +153,12 @@ trait EnvelopeProcessHelper[F[_]] extends NominateBaseHelper[F] {
     curTracker.candidates.hasGrownFrom(oldTracker.candidates).pureSP[F]
   }
 
-  protected def bumpBallotState(nodeID: NodeID, slotIndex: SlotIndex, tracker: NominateTracker): SP[F, NominateTracker] = {
+  protected def bumpBallotState(nodeID: NodeID,
+                                slotIndex: SlotIndex,
+                                tracker: NominateTracker): SP[F, NominateTracker] = {
     for {
       combinedCandidate <- nominateService.combineValues(tracker.candidates)
-      _ <- bumpState(nodeID, slotIndex, combinedCandidate, force = false)
+      _                 <- bumpState(nodeID, slotIndex, combinedCandidate, force = false)
     } yield tracker
   }
 

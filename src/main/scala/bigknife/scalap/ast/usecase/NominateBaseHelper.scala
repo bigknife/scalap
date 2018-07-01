@@ -6,7 +6,7 @@ import bigknife.sop._
 import bigknife.sop.implicits._
 
 trait NominateBaseHelper[F[_]] {
-  self: NominationCore[F] with ModelSupport[F] =>
+  self: NominationCore[F] with ModelSupport[F] with ConvenienceSupport[F] =>
   import model._
 
   protected def emitNominationMessage(
@@ -71,6 +71,7 @@ trait NominateBaseHelper[F[_]] {
     // **NOTE** if the node has accepted, but can't be convinced that
     // the `accepted` should be ratified by **the node**'s quorumset.
     // we should check and filter them.
+    /*
     def liftAndFilterRatifiedNodes(nodes: Set[NodeID]): SP[F, Set[NodeID]] = {
       nodes
         .foldLeft((Set.empty[NodeID], nodes).pureSP[F]) { (acc, n) =>
@@ -81,8 +82,8 @@ trait NominateBaseHelper[F[_]] {
         }
         .map(_._1)
     }
-
-    liftAndFilterRatifiedNodes(ratifiedNodes).map(quorumSet.isQuorumSlice)
+    */
+    self.liftAndFilterRatifiedNodes(ratifiedNodes, known).map(quorumSet.isQuorumSlice)
   }
 
 }

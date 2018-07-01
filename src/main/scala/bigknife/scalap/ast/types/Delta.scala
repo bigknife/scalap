@@ -6,7 +6,9 @@ package bigknife.scalap.ast.types
   * @param changed if the data changed since before
   * @tparam A data type
   */
-case class Delta[A](data: A, changed: Boolean)
+case class Delta[A](data: A, changed: Boolean) {
+  def unchanged: Boolean = !changed
+}
 
 object Delta {
   def changed[A](data: A): Delta[A] = Delta(data, changed = true)
