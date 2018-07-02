@@ -73,6 +73,8 @@ object Message {
           } else true
           cond1 && cond2 && cond3
       }
+
+      def notSane: Boolean = !isSane
     }
   }
 }

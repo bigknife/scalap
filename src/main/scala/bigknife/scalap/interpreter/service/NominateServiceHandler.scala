@@ -152,11 +152,6 @@ class NominateServiceHandler extends NominateService.Handler[Stack] {
       latestNominations = tracker.latestNominations + (envelope.statement.nodeID -> envelope))
   }
 
-  override def verifyEnvelopeSignature[M <: Message](envelope: Envelope[M]): Stack[Boolean] =
-    Stack { setting =>
-      setting.connect.verifySignature(envelope)
-    }
-
   override def validateValue(value: Value): Stack[Boolean] = Stack { setting =>
     // ignore MayBeValid now.
     setting.connect.validateValue(value) == Value.Validity.FullyValidated

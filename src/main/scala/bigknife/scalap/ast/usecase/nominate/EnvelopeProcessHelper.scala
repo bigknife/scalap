@@ -14,12 +14,25 @@ trait EnvelopeProcessHelper[F[_]] extends NominateBaseHelper[F] {
   protected val invalidEnvelopeState: SP[F, Envelope.State] = Envelope.State.invalid.pureSP[F]
 
   /**
+    * statement is newer than that saved in tracker
+    * @param statement statement to be determined newer or not
+    * @param tracker tracker
+    * @return
+    */
+  def isNewerStatement(statement: Statement[Message.Nomination],
+                       tracker: NominateTracker): Boolean = {
+    !tracker.latestNominations.contains(statement.nodeID) ||
+      statement.newerThan(
+        tracker.latestNominations(statement.nodeID).statement)
+  }
+
+  /**
     * verify the signature of the envelope is valid.
     * @param envelope nomination message envelope
     * @return
     */
   protected def verifySignature(envelope: Envelope[Message.Nomination]): SP[F, Boolean] =
-    nominateService.verifyEnvelopeSignature(envelope)
+    envelopeService.verifyEnvelopeSignature(envelope)
 
   protected def saveNominationEnvelope(
       tracker: NominateTracker,

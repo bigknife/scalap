@@ -15,5 +15,6 @@ object component {
     val nominateService: NominateService[F]
     val nodeStore: NodeStore[F]
     val ballotService: BallotService[F]
+    val envelopeService: EnvelopeService[F]
   }
 }

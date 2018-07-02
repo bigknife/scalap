@@ -74,13 +74,6 @@ import bigknife.sop.implicits._
                      envelope: Envelope[Message.Nomination]): P[F, NominateTracker]
 
   /**
-    * verify envelope's signature
-    * @param envelope envelope
-    * @return
-    */
-  def verifyEnvelopeSignature[M <: Message](envelope: Envelope[M]): P[F, Boolean]
-
-  /**
     * validate the value is legal on the application level
     * @param value value
     * @return

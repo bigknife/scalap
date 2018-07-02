@@ -22,15 +22,17 @@ package object types {
   type NominationEnvelope       = Envelope[Message.Nomination]
   type NominationEnvelopeResult = BoolResult[NominationEnvelope]
 
+  type BallotEnvelope       = Envelope[Message.BallotMessage]
+
   type NominationStatement = Statement[Message.Nomination]
 
   type Predicate[A]                     = A => Boolean
   type StatementPredicate[M <: Message] = Predicate[Statement[M]]
 
-  type BallotPhrase = BallotTracker.Phrase
-  val ballotPhrasePrepare: BallotPhrase     = BallotTracker.Phrase.Prepare
-  val ballotPhraseConfirm: BallotPhrase     = BallotTracker.Phrase.Confirm
-  val ballotPhraseExternalize: BallotPhrase = BallotTracker.Phrase.Externalize
+  type BallotPhase = BallotTracker.Phase
+  val ballotPhrasePrepare: BallotPhase     = BallotTracker.Phase.Prepare
+  val ballotPhraseConfirm: BallotPhase     = BallotTracker.Phase.Confirm
+  val ballotPhraseExternalize: BallotPhase = BallotTracker.Phase.Externalize
 
-  object implicits extends Delta.Syntax
+  object implicits extends Delta.Syntax with Message.Ops
 }

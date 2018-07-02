@@ -1,6 +1,7 @@
 package bigknife.scalap.ast.usecase.nominate
 
 import bigknife.scalap.ast.types._
+import bigknife.scalap.ast.types.implicits._
 import bigknife.scalap.ast.usecase.{ConvenienceSupport, ModelSupport}
 import bigknife.sop._
 import bigknife.sop.implicits._
@@ -16,16 +17,21 @@ trait EnvelopeProcess[F[_]] extends NominationCore[F] {
     * @param envelope message envelope
     * @return
     */
-  override def processEnvelope(nodeID: NodeID,
-                               envelope: NominationEnvelope): SP[F, Envelope.State] = {
+  override def processNominationEnvelope(nodeID: NodeID,
+                                         envelope: NominationEnvelope): SP[F, Envelope.State] = {
+    val nodeID    = envelope.statement.nodeID
     val slotIndex = envelope.statement.slotIndex
+    val statement = envelope.statement
+    val message   = statement.message
+
     for {
+      tracker  <- nodeStore.getNominateTracker(nodeID, slotIndex)
       verified <- self.verifySignature(envelope)
-      state <- if (!verified) invalidEnvelopeState
-      else
+      state <- ifM[Envelope.State](
+        Envelope.State.invalid,
+        _ => verified && message.isSane && self.isNewerStatement(statement, tracker)) { _ =>
         for {
           qSet                   <- nodeStore.getQuorumSet(nodeID)
-          tracker                <- nodeStore.getNominateTracker(nodeID, slotIndex)
           trackerWithNewEnvelope <- self.saveNominationEnvelope(tracker, envelope)
           reduced                <- self.reduceNomination(trackerWithNewEnvelope, envelope.statement.message)
           valid                  <- self.validateNomination(nodeID, slotIndex, reduced)
@@ -50,6 +56,7 @@ trait EnvelopeProcess[F[_]] extends NominationCore[F] {
             bumpBallotState(nodeID, slotIndex, emitted))
           _ <- nodeStore.saveNominateTracker(nodeID, bumped)
         } yield Envelope.State.valid
+      }
     } yield state
   }
 }

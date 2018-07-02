@@ -15,7 +15,7 @@ trait NominateBaseHelper[F[_]] {
       msgResult: NominationEnvelopeResult): SP[F, NominateTracker] = {
     if (msgResult.successful) {
       for {
-        st <- self.processEnvelope(nodeID, msgResult.data)
+        st <- self.processNominationEnvelope(nodeID, msgResult.data)
         ret <- if (st == Envelope.State.Valid) for {
           nt <- nominateService.broadcastEnvelope(tracker, msgResult.data): SP[F, NominateTracker]
         } yield nt

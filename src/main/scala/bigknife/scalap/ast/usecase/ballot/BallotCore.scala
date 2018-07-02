@@ -31,4 +31,12 @@ trait BallotCore[F[_]] {
     * @return
     */
   def abandonBallot(nodeID: NodeID, slotIndex: SlotIndex, counter: Int): SP[F, Unit]
+
+  /**
+    * process ballot message envelope
+    * @param nodeID node that processing the envelope
+    * @param envelope coming envelope that node received
+    * @return envelope.state
+    */
+  def processBallotEnvelope(nodeID: NodeID, envelope: BallotEnvelope): SP[F, Envelope.State]
 }

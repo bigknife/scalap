@@ -22,5 +22,5 @@ trait NominationCore[F[_]] {
     * @param envelope message envelope
     * @return
     */
-  def processEnvelope(nodeID: NodeID, envelope: NominationEnvelope): SP[F, Envelope.State]
+  def processNominationEnvelope(nodeID: NodeID, envelope: NominationEnvelope): SP[F, Envelope.State]
 }
