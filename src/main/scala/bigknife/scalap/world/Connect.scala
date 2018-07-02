@@ -49,6 +49,12 @@ trait Connect {
     * @return
     */
   def combineValues(valueSet: ValueSet): Value
+
+  /**
+    * run abandon ballot with counter outside
+    * @param counter ballot's counter
+    */
+  def runAbandonBallot(counter: Int): Unit
 }
 
 object Connect {
@@ -101,5 +107,12 @@ object Connect {
       * @return
       */
     override def combineValues(valueSet: ValueSet): Value = valueSet.unsafeHeadValue()
+
+    /**
+      * run abandon ballot with counter outside
+      *
+      * @param counter ballot's counter
+      */
+    override def runAbandonBallot(counter: Int): Unit = ()
   }
 }
