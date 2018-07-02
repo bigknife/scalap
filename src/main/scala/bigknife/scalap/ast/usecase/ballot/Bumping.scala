@@ -57,4 +57,28 @@ trait Bumping[F[_]] extends BallotCore[F] {
       }
     } yield ()
   }
+
+  /**
+    * abandon ballot of counter
+    *
+    * @param nodeID    node id
+    * @param slotIndex slot index
+    * @param counter   counter
+    * @return
+    */
+  override def abandonBallot(nodeID: NodeID, slotIndex: SlotIndex, counter: Int): SP[F, Unit] = {
+    // got current candidate value
+    for {
+      nominateTracker <- nodeStore.getNominateTracker(nodeID, slotIndex)
+      ballotTracker   <- nodeStore.getBallotTracker(nodeID, slotIndex)
+      value           <- nominateService.combineValues(nominateTracker.candidates)
+      valueModified <- ifM[Value](value, _.isEmpty) { x =>
+        (if (ballotTracker.currentBallotNotNull) ballotTracker.current.value else x).pureSP[F]
+      }
+      _ <- ifM[Unit]((), _ => valueModified.isEmpty) { _ =>
+        if (counter <= 0) bumpState(nodeID, slotIndex, valueModified, force = true)
+        else bumpState(nodeID, slotIndex, valueModified, counter)
+      }
+    } yield ()
+  }
 }

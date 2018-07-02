@@ -22,4 +22,13 @@ trait BallotCore[F[_]] {
     * @return
     */
   def bumpState(nodeID: NodeID, slotIndex: SlotIndex, value: Value, counter: Int): SP[F, Unit]
+
+  /**
+    * abandon ballot of counter
+    * @param nodeID node id
+    * @param slotIndex slot index
+    * @param counter counter
+    * @return
+    */
+  def abandonBallot(nodeID: NodeID, slotIndex: SlotIndex, counter: Int): SP[F, Unit]
 }

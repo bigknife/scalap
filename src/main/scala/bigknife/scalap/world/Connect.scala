@@ -54,7 +54,7 @@ trait Connect {
     * run abandon ballot with counter outside
     * @param counter ballot's counter
     */
-  def runAbandonBallot(counter: Int): Unit
+  def runAbandonBallot(nodeID: NodeID, slotIndex: SlotIndex, counter: Int): Unit
 }
 
 object Connect {
@@ -113,6 +113,6 @@ object Connect {
       *
       * @param counter ballot's counter
       */
-    override def runAbandonBallot(counter: Int): Unit = ()
+    override def runAbandonBallot(nodeID: NodeID, slotIndex: SlotIndex, counter: Int): Unit = ()
   }
 }

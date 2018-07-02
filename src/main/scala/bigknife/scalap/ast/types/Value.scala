@@ -3,7 +3,9 @@ package bigknife.scalap.ast.types
 /**
   * value, whatever data, represented by opaque bytes
   */
-trait Value extends OpaqueBytes with Ordered[Value] {}
+trait Value extends OpaqueBytes with Ordered[Value] {
+  def isEmpty: Boolean = this == Value.BottomValue
+}
 
 object Value {
   private object BottomValue extends Value {

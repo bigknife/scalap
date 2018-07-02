@@ -42,7 +42,7 @@ private[service] class BallotServiceHandler extends BallotService.Handler[Stack]
         override def run(): Unit = {
           log.debug(s"start ballot timer for $nodeID-Slot[$slotIndex] with timeout = ${timeout}ms")
           util.ec.submitBallotTask {
-            setting.connect.runAbandonBallot(counter = 0)
+            setting.connect.runAbandonBallot(nodeID, slotIndex, counter = 0)
           }
         }
       }, timeout)
@@ -55,6 +55,7 @@ private[service] class BallotServiceHandler extends BallotService.Handler[Stack]
       val timer = timerCache.get((nodeID, slotIndex))
       timer.foreach(_.cancel())
       timerCache.remove((nodeID, slotIndex))
+      ()
     }
   }
 }
