@@ -15,7 +15,7 @@ import bigknife.sop.implicits._
     * @param value coming value
     * @return
     */
-  def newBallot(tracker: BallotTracker, value: Value): P[F, Ballot]
+  def newBallot(tracker: BallotTracker, value: Value, counter: Int): P[F, Ballot]
 
   /**
     * compute timeout in millisecond

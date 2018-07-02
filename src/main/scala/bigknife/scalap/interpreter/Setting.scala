@@ -4,12 +4,13 @@ package interpreter
 import bigknife.scalap.world.Connect
 
 case class Setting(
-    connect: world.Connect
+    connect: world.Connect,
+    maxTimeoutSeconds: Int
 )
 
 object Setting {
   def default(): Setting = {
     val connect = Connect.dummy
-    Setting(connect)
+    Setting(connect, maxTimeoutSeconds = 30 * 60)
   }
 }

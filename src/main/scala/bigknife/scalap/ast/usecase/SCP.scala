@@ -8,6 +8,7 @@ trait SCP[F[_]] extends NominationProtocol[F] with BallotProtocol[F] {
   self: NominateHelper[F]
     with EnvelopeProcessHelper[F]
     with BumpingHelper[F]
+    with BallotBaseHelper[F]
     with ConvenienceSupport[F]
     with ModelSupport[F] =>
 }
