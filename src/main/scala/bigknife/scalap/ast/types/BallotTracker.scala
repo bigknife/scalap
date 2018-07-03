@@ -5,8 +5,8 @@ case class BallotTracker(
                           slotIndex: SlotIndex,
                           phase: BallotPhase, // phi, current phrase
                           current: Ballot, // b, current ballot try to prepare and commit
-                          prepare: Ballot, // p, accepted prepare
-                          preparePrime: Ballot, // p', accepted preparePrime, less and incompatible to prepare
+                          prepared: Ballot, // p, accepted prepare
+                          preparedPrime: Ballot, // p', accepted preparePrime, less and incompatible to prepare
                           high: Ballot, // h, highest confirmed ballot.counter, if is 0, no confirmed
                           commit: Ballot, // c, lowest confirmed ballot.counter
                           latestBallotEnvelope: Map[NodeID, BallotEnvelope[Message.BallotMessage]], // M
@@ -16,11 +16,11 @@ case class BallotTracker(
   def currentBallotIsNull: Boolean = current.isNull
   def currentBallotNotNull: Boolean = current.notNull
 
-  def prepareBallotIsNull: Boolean = prepare.isNull
-  def prepareBallotNotNull: Boolean = prepare.notNull
+  def preparedBallotIsNull: Boolean = prepared.isNull
+  def preparedBallotNotNull: Boolean = prepared.notNull
 
-  def preparePrimeBallotIsNull: Boolean = preparePrime.isNull
-  def preparePrimeBallotNotNull: Boolean = preparePrime.notNull
+  def preparedPrimeBallotIsNull: Boolean = preparedPrime.isNull
+  def preparedPrimeBallotNotNull: Boolean = preparedPrime.notNull
 
   def highBallotIsNull: Boolean = high.isNull
   def highBallotNotNull: Boolean = high.notNull
@@ -28,8 +28,10 @@ case class BallotTracker(
   def commitBallotIsNull: Boolean = commit.isNull
   def commitBallotNotNull: Boolean = commit.notNull
 
-  def isExternalizePhrase: Boolean = phase.isExternalize
-  def notExternalizePhrase: Boolean = ! phase.isExternalize
+  def isExternalizePhase: Boolean = phase.isExternalize
+  def notExternalizePhase: Boolean = ! phase.isExternalize
+
+  def isCommitPhase: Boolean = phase.isCommit
 }
 
 object BallotTracker {
@@ -38,6 +40,12 @@ object BallotTracker {
 
     def isExternalize: Boolean = is("Externalized")
     def notExternalize: Boolean = !isExternalize
+
+    def isCommit: Boolean = is("Commit")
+    def notCommit: Boolean = !isCommit
+
+    def isPrepare: Boolean = is("Prepare")
+    def notPrepare: Boolean = !isPrepare
   }
   object Phase {
     private final case class _Phase(name: String, ord: Int) extends Phase {
@@ -47,7 +55,7 @@ object BallotTracker {
       override def is(name: String): Boolean = this.name == name
     }
     val Prepare: Phase     = _Phase("Prepare", 1)
-    val Confirm: Phase     = _Phase("Confirm", 2)
+    val Confirm: Phase     = _Phase("Commit", 2)
     val Externalize: Phase = _Phase("Externalize", 3)
   }
 

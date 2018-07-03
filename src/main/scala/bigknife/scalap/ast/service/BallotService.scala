@@ -46,4 +46,19 @@ import bigknife.sop.implicits._
     * @return
     */
   def stopBallotTimer(nodeID: NodeID, slotIndex: SlotIndex): P[F, Unit]
+
+  /**
+    * try to set prepare ballot to a tracker
+    * @param tracker tracker
+    * @param ballot ballot
+    * @return
+    */
+  def setPrepared(tracker: BallotTracker, ballot: Ballot): P[F, Delta[BallotTracker]]
+
+  /**
+    * check if we also need to clear commit of tracker
+    * @param tracker tracker
+    * @return
+    */
+  def clearCommitIfNeeded(tracker: BallotTracker): P[F, Delta[BallotTracker]]
 }

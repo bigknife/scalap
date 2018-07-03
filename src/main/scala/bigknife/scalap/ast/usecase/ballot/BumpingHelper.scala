@@ -13,7 +13,7 @@ trait BumpingHelper[F[_]] {
   protected def updateCurrentBallotForTracker(tracker: BallotTracker,
                                               newB: Ballot): SP[F, Delta[BallotTracker]] = {
     // only update when in prepare phase or confirm phase
-    ifM[Delta[BallotTracker]](Delta.unchanged(tracker), _.data.notExternalizePhrase) { x =>
+    ifM[Delta[BallotTracker]](Delta.unchanged(tracker), _.data.notExternalizePhase) { x =>
       val t = x.data
       // if current is empty, then set ballot directly
       if (t.currentBallotIsNull) {
@@ -40,7 +40,7 @@ trait BumpingHelper[F[_]] {
           case (_, Envelope.BallotEnvelope(statement, _)) =>
             statement match {
               case x: Message.Prepare =>
-                x.prepare.counter >= tracker.current.counter
+                x.prepared.counter >= tracker.current.counter
               case _ => true
             }
         }
@@ -57,7 +57,7 @@ trait BumpingHelper[F[_]] {
           val t1                 = tracker.copy(heardFromQuorum = true)
 
           val startBallotTimer =
-            ifM[Unit]((), _ => !oldHeardFromQuorum && tracker.notExternalizePhrase) { _ =>
+            ifM[Unit]((), _ => !oldHeardFromQuorum && tracker.notExternalizePhase) { _ =>
               for {
                 timeout <- ballotService.computeBallotTimeout(tracker)
                 _       <- ballotService.startBallotTimer(tracker.nodeID, tracker.slotIndex, timeout)
@@ -75,7 +75,7 @@ trait BumpingHelper[F[_]] {
         val oldHeardFromQuorum = tracker.heardFromQuorum
         if (isQ) {
           val t1 = tracker.copy(heardFromQuorum = true)
-          val stopBallotTimer = ifM[Unit]((), _ => tracker.notExternalizePhrase) { _ =>
+          val stopBallotTimer = ifM[Unit]((), _ => tracker.notExternalizePhase) { _ =>
             ballotService.stopBallotTimer(tracker.nodeID, tracker.slotIndex)
           }
           val delta = (if (!oldHeardFromQuorum) t1.changed else t1.unchanged).pureSP[F]

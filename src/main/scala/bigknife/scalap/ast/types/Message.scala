@@ -11,11 +11,11 @@ object Message {
   ) extends Message
 
   case class Prepare(
-      ballot: Ballot,
-      prepare: Ballot,
-      preparePrime: Ballot,
-      hCounter: Int,
-      cCounter: Int
+                      ballot: Ballot,
+                      prepared: Ballot,
+                      preparedPrime: Ballot,
+                      hCounter: Int,
+                      cCounter: Int
   ) extends BallotMessage
 
   /** also: Commit */

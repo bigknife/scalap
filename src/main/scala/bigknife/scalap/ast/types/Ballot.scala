@@ -19,4 +19,5 @@ case class Ballot(counter: Int, value: Value) extends Ordered[Ballot] {
 
 object Ballot {
   val Null: Ballot = Ballot(0, Value.bottom)
+  def max(value: Value): Ballot = Ballot(Int.MaxValue, value)
 }

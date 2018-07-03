@@ -103,8 +103,7 @@ trait EnvelopeProcessHelper[F[_]] extends NominateBaseHelper[F] {
       votes.foldLeft(ValueSet.empty.pureSP[F]) { (acc, v) =>
         for {
           pre <- acc
-          passedFA <- federatedAccept(v,
-                                      quorumSet,
+          passedFA <- federatedAccept(quorumSet,
                                       tracker.latestNominations,
                                       votePredicate(v),
                                       acceptPredicate(v))
@@ -148,7 +147,7 @@ trait EnvelopeProcessHelper[F[_]] extends NominateBaseHelper[F] {
       accepted.foldLeft(ValueSet.empty.pureSP[F]) { (acc, v) =>
         for {
           pre    <- acc
-          passed <- federatedRatify(v, quorumSet, tracker.latestNominations, acceptPredicate(v))
+          passed <- federatedRatify(quorumSet, tracker.latestNominations, acceptPredicate(v))
         } yield if (passed) pre + v else pre
       }
     }

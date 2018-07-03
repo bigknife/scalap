@@ -42,7 +42,7 @@ trait Bumping[F[_]] extends BallotCore[F] {
     // and, if in externalize phrase, can't bump
     for {
       tracker <- nodeStore.getBallotTracker(nodeID, slotIndex)
-      _ <- ifM[Unit]((), _ => tracker.isExternalizePhrase) { _ =>
+      _ <- ifM[Unit]((), _ => tracker.isExternalizePhase) { _ =>
         for {
           newB      <- ballotService.newBallot(tracker, value, counter)
           trackerD0 <- self.updateCurrentBallotForTracker(tracker, newB)

@@ -41,7 +41,7 @@ trait OpaqueBytesTransformers {
   implicit val PrepareStatementBytesTransformer: OpaqueBytesTransformer[Statement.Prepare] =
     OpaqueBytesTransformer[Statement.Prepare] { n =>
       n.nodeID.bytes ++ n.slotIndex.bytes ++ n.quorumSetHash.bytes ++
-        n.message.ballot.bytes ++ n.message.prepare.bytes ++ n.message.preparePrime.bytes ++
+        n.message.ballot.bytes ++ n.message.prepared.bytes ++ n.message.preparedPrime.bytes ++
         n.message.cCounter.bytes ++ n.message.hCounter.bytes
     }
 
