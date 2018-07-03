@@ -22,9 +22,12 @@ private[service] class BallotServiceHandler extends BallotService.Handler[Stack]
       else Ballot(1, value)
     }
 
-  override def recordEnvelope[M <: BallotMessage](tracker: BallotTracker, envelope: BallotEnvelope[M]): Stack[BallotTracker] =
+  override def recordEnvelope[M <: BallotMessage](
+      tracker: BallotTracker,
+      envelope: BallotEnvelope[M]): Stack[BallotTracker] =
     Stack {
-      tracker.copy(latestBallotEnvelope = tracker.latestBallotEnvelope + (envelope.statement.nodeID -> envelope))
+      tracker.copy(
+        latestBallotEnvelope = tracker.latestBallotEnvelope + (envelope.statement.nodeID -> envelope))
     }
 
   override def computeBallotTimeout(tracker: BallotTracker): Stack[Long] = Stack { setting =>
@@ -69,6 +72,21 @@ private[service] class BallotServiceHandler extends BallotService.Handler[Stack]
         ()
       }
   }
+
+  override def setPrepared(tracker: BallotTracker, ballot: Ballot): Stack[Delta[BallotTracker]] =
+    Stack {
+      if (tracker.prepared.notNull) {
+        if (tracker.prepared < ballot) {
+          val dPreparedPrime =
+            if (tracker.prepared.incompatible(ballot)) tracker.prepared else tracker.preparedPrime
+          Delta.changed(tracker.copy(prepared = ballot, preparedPrime = dPreparedPrime))
+        } else {
+          if (tracker.prepared > ballot && (tracker.preparedPrime.notNull && tracker.preparedPrime < ballot)) {
+            Delta.changed(tracker.copy(preparedPrime = ballot))
+          } else Delta.unchanged(tracker)
+        }
+      } else Delta.changed(tracker.copy(prepared = ballot))
+    }
 }
 
 object BallotServiceHandler {
