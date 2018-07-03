@@ -15,4 +15,10 @@ import bigknife.sop.implicits._
   def verifyEnvelopeSignature[M <: Message](
       envelope: Envelope[M]): P[F, Boolean]
 
+  /**
+    * validate the value is legal on the application level
+    * @param value value
+    * @return
+    */
+  def validateValue(value: Value): P[F, Boolean]
 }

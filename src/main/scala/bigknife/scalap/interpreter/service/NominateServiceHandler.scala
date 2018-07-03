@@ -6,6 +6,7 @@ import bigknife.scalap.ast.service.NominateService
 import bigknife.scalap.ast.types.Message.Nomination
 import bigknife.scalap.ast.types.Value.Validity
 import bigknife.scalap.ast.types._
+import implicits._
 import bigknife.scalap.util._
 import org.slf4j.LoggerFactory
 
@@ -131,16 +132,15 @@ class NominateServiceHandler extends NominateService.Handler[Stack] {
         nomination
       )
       val signature: Signature =
-        setting.connect.signData(statement.toBytes, nodeID)
-      Envelope(statement, signature)
+        setting.connect.signData(statement.bytes, nodeID)
+      Envelope.NominationEnvelope(statement, signature)
     }
 
   override def broadcastEnvelope(tracker: NominateTracker,
                                  envelope: Envelope[Nomination]): Stack[NominateTracker] = Stack {
     setting =>
       if (tracker.lastSentEnvelope.isEmpty ||
-          envelope.statement
-            .newerThan(tracker.lastSentEnvelope.get.statement)) {
+          Statement.newerThan(envelope.statement, tracker.lastSentEnvelope.get.statement)) {
         setting.connect.broadcastMessage(envelope)
         tracker.sentEnvelope(envelope)
       } else tracker
@@ -150,11 +150,6 @@ class NominateServiceHandler extends NominateService.Handler[Stack] {
                               envelope: Envelope[Nomination]): Stack[NominateTracker] = Stack {
     tracker.copy(
       latestNominations = tracker.latestNominations + (envelope.statement.nodeID -> envelope))
-  }
-
-  override def validateValue(value: Value): Stack[Boolean] = Stack { setting =>
-    // ignore MayBeValid now.
-    setting.connect.validateValue(value) == Value.Validity.FullyValidated
   }
 
   override def combineValues(valueSet: ValueSet): Stack[Value] = Stack {setting =>

@@ -18,6 +18,14 @@ import bigknife.sop.implicits._
   def newBallot(tracker: BallotTracker, value: Value, counter: Int): P[F, Ballot]
 
   /**
+    * record envelope to tracker
+    * @param tracker ballot tracker
+    * @param envelope envelope
+    * @return
+    */
+  def recordEnvelope[M <: BallotMessage](tracker: BallotTracker, envelope: BallotEnvelope[M]): P[F, BallotTracker]
+
+  /**
     * compute timeout in millisecond
     * @param tracker tracer.
     * @return

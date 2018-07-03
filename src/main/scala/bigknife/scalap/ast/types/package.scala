@@ -11,18 +11,16 @@ package object types {
     }
 
     def empty: ValueSet = apply()
-
-    def toBytes(valueSet: ValueSet): Array[Byte] = {
-      val v: Vector[Array[Byte]] = valueSet.toVector.map(_.bytes)
-      v.foldLeft(Array.emptyByteArray) { _ ++ _ }
-    }
   }
 
   type NominateNewValuesResult  = BoolResult[NominateTracker]
   type NominationEnvelope       = Envelope[Message.Nomination]
   type NominationEnvelopeResult = BoolResult[NominationEnvelope]
 
-  type BallotEnvelope       = Envelope[Message.BallotMessage]
+  type BallotMessage = Message.BallotMessage
+  type BallotEnvelope[M <: BallotMessage] = Envelope.BallotEnvelope[M]
+  type BallotStatement[M <: BallotMessage] = Statement.BallotStatement[M]
+
 
   type NominationStatement = Statement[Message.Nomination]
 
@@ -34,5 +32,9 @@ package object types {
   val ballotPhraseConfirm: BallotPhase     = BallotTracker.Phase.Confirm
   val ballotPhraseExternalize: BallotPhase = BallotTracker.Phase.Externalize
 
-  object implicits extends Delta.Syntax with Message.Ops
+  object implicits
+      extends Delta.Syntax
+      with Message.Ops
+      with OpaqueBytes.Syntax
+      with OpaqueBytesTransformers
 }

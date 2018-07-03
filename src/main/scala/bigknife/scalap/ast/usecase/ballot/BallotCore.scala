@@ -38,5 +38,5 @@ trait BallotCore[F[_]] {
     * @param envelope coming envelope that node received
     * @return envelope.state
     */
-  def processBallotEnvelope(nodeID: NodeID, envelope: BallotEnvelope): SP[F, Envelope.State]
+  def processBallotEnvelope[M <: BallotMessage](nodeID: NodeID, envelope: BallotEnvelope[M]): SP[F, Envelope.State]
 }

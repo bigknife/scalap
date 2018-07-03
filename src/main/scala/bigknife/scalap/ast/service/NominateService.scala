@@ -74,13 +74,6 @@ import bigknife.sop.implicits._
                      envelope: Envelope[Message.Nomination]): P[F, NominateTracker]
 
   /**
-    * validate the value is legal on the application level
-    * @param value value
-    * @return
-    */
-  def validateValue(value: Value): P[F, Boolean]
-
-  /**
     * combine value sets to one value
     * @param valueSet values
     * @return

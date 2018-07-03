@@ -18,6 +18,19 @@ object Message {
       cCounter: Int
   ) extends BallotMessage
 
+  /** also: Commit */
+  case class Commit(
+      ballot: Ballot,
+      preparedCounter: Int,
+      hCounter: Int,
+      cCounter: Int
+  ) extends BallotMessage
+
+  case class Externalize(
+      commit: Ballot,
+      hCounter: Int
+  ) extends BallotMessage
+
   class NominationBuilder {
     private val voted: collection.mutable.ListBuffer[Value]    = collection.mutable.ListBuffer.empty
     private val accepted: collection.mutable.ListBuffer[Value] = collection.mutable.ListBuffer.empty

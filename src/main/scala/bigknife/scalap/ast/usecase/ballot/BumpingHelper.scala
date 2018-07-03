@@ -37,7 +37,7 @@ trait BumpingHelper[F[_]] {
       // first, collect nodes that has accepted prepare.
       val nodes: Set[NodeID] = tracker.latestBallotEnvelope
         .filter {
-          case (_, Envelope(statement, _)) =>
+          case (_, Envelope.BallotEnvelope(statement, _)) =>
             statement match {
               case x: Message.Prepare =>
                 x.prepare.counter >= tracker.current.counter

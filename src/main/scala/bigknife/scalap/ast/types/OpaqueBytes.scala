@@ -24,3 +24,12 @@ trait OpaqueBytes {
     s"$cls(0x$expr)"
   }
 }
+
+object OpaqueBytes {
+  case class OpaqueBytesTransformer[A](f: A => Array[Byte])
+
+  trait Syntax {
+    private case class Simple(bytes: Array[Byte]) extends OpaqueBytes
+    implicit def toOpaqueBytes[A](a: A)(implicit T: OpaqueBytesTransformer[A]): OpaqueBytes = Simple(T.f(a))
+  }
+}

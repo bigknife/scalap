@@ -9,8 +9,8 @@ case class BallotTracker(
                           preparePrime: Ballot, // p', accepted preparePrime, less and incompatible to prepare
                           high: Ballot, // h, highest confirmed ballot.counter, if is 0, no confirmed
                           commit: Ballot, // c, lowest confirmed ballot.counter
-                          latestBallotEnvelope: Map[NodeID, Envelope[Message.BallotMessage]], // M
-                          lastSentEnvelope: Option[Envelope[Message.BallotMessage]],
+                          latestBallotEnvelope: Map[NodeID, BallotEnvelope[Message.BallotMessage]], // M
+                          lastSentEnvelope: Option[BallotEnvelope[Message.BallotMessage]],
                           heardFromQuorum: Boolean
 ) {
   def currentBallotIsNull: Boolean = current.isNull

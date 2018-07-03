@@ -1,8 +1,17 @@
 package bigknife.scalap.ast.types
 
-case class Envelope[M <: Message](statement: Statement[M], signature: Signature)
+sealed trait Envelope[+M <: Message] {
+  def statement: Statement[M]
+  def signature: Signature
+}
 
 object Envelope {
+  case class NominationEnvelope(statement: Statement.NominationStatement, signature: Signature)
+      extends Envelope[Message.Nomination]
+  case class BallotEnvelope[+M <: Message.BallotMessage](statement: Statement.BallotStatement[M],
+                                                        signature: Signature)
+      extends Envelope[M]
+
   sealed trait State
   object State {
     case object Valid extends State {
@@ -16,5 +25,5 @@ object Envelope {
   }
 
   ////// smart constructors
-  def fakeNominate: Envelope[Message.Nomination] = Envelope(Statement.fakeNominate, Signature.empty)
+  def fakeNominate: Envelope[Message.Nomination] = NominationEnvelope(Statement.fakeNominate, Signature.empty)
 }

@@ -5,6 +5,7 @@ package bigknife.scalap.ast.types
   */
 trait Value extends OpaqueBytes with Ordered[Value] {
   def isEmpty: Boolean = this == Value.BottomValue
+  def notEmpty: Boolean = !isEmpty
 }
 
 object Value {

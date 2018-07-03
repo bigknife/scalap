@@ -23,8 +23,8 @@ trait EnvelopeProcess[F[_]] extends BallotCore[F] {
     * @param envelope coming envelope that node received
     * @return envelope.state
     */
-  override def processBallotEnvelope(nodeID: NodeID,
-                                     envelope: BallotEnvelope): SP[F, Envelope.State] = {
+  override def processBallotEnvelope[M <: BallotMessage](nodeID: NodeID,
+                                     envelope: BallotEnvelope[M]): SP[F, Envelope.State] = {
     val nodeID    = envelope.statement.nodeID
     val slotIndex = envelope.statement.slotIndex
     val statement = envelope.statement
@@ -36,27 +36,27 @@ trait EnvelopeProcess[F[_]] extends BallotCore[F] {
       valid    <- self.validateValues(statement)
       state <- ifM[Envelope.State](
         Envelope.State.invalid,
+        _ => verified && message.isSane && valid && self.isNewerStatement(statement, tracker)) {
         _ =>
-          verified && message.isSane && valid == Value.Validity.FullyValidated && self
-            .isNewerStatement(statement, tracker)) { _ =>
-        for {
-          qSet <- nodeStore.getQuorumSet(nodeID)
-          trackerWithState <- if (tracker.phase.notExternalize) for {
-            trackerD11 <- recordEnvelope(tracker, envelope)
-            trackerD12 <- self.advanceSlot(statement, trackerD11)
-          } yield (trackerD12, Envelope.State.valid)
-          else
-            for {
-              workingBallot <- self.getWorkingBallot(statement)
-              trackerD11WithState <- ifM[(BallotTracker, Envelope.State)](
-                (tracker, Envelope.State.invalid),
-                _._1.commit.compatible(workingBallot)) { x =>
-                for {
-                  x0 <- self.recordEnvelope(x._1, envelope)
-                } yield (x0, Envelope.State.valid)
-              }
-            } yield trackerD11WithState
-        } yield trackerWithState._2
+          for {
+            qSet <- nodeStore.getQuorumSet(nodeID)
+            trackerWithState <- if (tracker.phase.notExternalize) for {
+              trackerD11 <- recordEnvelope(tracker, envelope)
+              trackerD12 <- self.advanceSlot(statement, trackerD11)
+            } yield (trackerD12, Envelope.State.valid)
+            else
+              for {
+                workingBallot <- self.getWorkingBallot(statement)
+                trackerD11WithState <- ifM[(BallotTracker, Envelope.State)](
+                  (tracker, Envelope.State.invalid),
+                  _._1.commit.compatible(workingBallot)) { x =>
+                  for {
+                    x0 <- self.recordEnvelope(x._1, envelope)
+                  } yield (x0, Envelope.State.valid)
+                }
+              } yield trackerD11WithState
+            _ <- nodeStore.saveBallotTracker(nodeID, trackerWithState._1)
+          } yield trackerWithState._2
       }
     } yield state
   }

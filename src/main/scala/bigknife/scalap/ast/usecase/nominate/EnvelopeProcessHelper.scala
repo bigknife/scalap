@@ -22,8 +22,12 @@ trait EnvelopeProcessHelper[F[_]] extends NominateBaseHelper[F] {
   def isNewerStatement(statement: Statement[Message.Nomination],
                        tracker: NominateTracker): Boolean = {
     !tracker.latestNominations.contains(statement.nodeID) ||
-      statement.newerThan(
+    Statement.newerThan(statement, tracker.latestNominations(statement.nodeID).statement)
+
+    /*
+    statement.newerThan(
         tracker.latestNominations(statement.nodeID).statement)
+   */
   }
 
   /**
@@ -67,7 +71,7 @@ trait EnvelopeProcessHelper[F[_]] extends NominateBaseHelper[F] {
     val votedSP = nomination.voted.foldLeft(ValueSet.empty.pureSP[F]) { (acc, n) =>
       for {
         pre    <- acc
-        passed <- nominateService.validateValue(n)
+        passed <- envelopeService.validateValue(n)
         next   <- (if (passed) pre + n else pre).pureSP[F]
       } yield next
     }
@@ -85,11 +89,11 @@ trait EnvelopeProcessHelper[F[_]] extends NominateBaseHelper[F] {
     // if the nodes from which current received nominations that accepted the vote,
     // is vblocking of current node's vblocking, or a quorum of current node, then we accept it
     def votePredicate(v: Value): StatementPredicate[Message.Nomination] = {
-      (nom: Statement[Message.Nomination]) =>
+      nom: Statement[Message.Nomination] =>
         nom.message.voted.contain(v)
     }
     def acceptPredicate(v: Value): StatementPredicate[Message.Nomination] = {
-      (nom: NominationStatement) =>
+      nom: NominationStatement =>
         nom.message.accepted.contain(v)
     }
 
@@ -104,7 +108,7 @@ trait EnvelopeProcessHelper[F[_]] extends NominateBaseHelper[F] {
                                       tracker.latestNominations,
                                       votePredicate(v),
                                       acceptPredicate(v))
-          passedV <- nominateService.validateValue(v)
+          passedV <- envelopeService.validateValue(v)
         } yield if (passedFA && passedV) pre + v else pre
       }
     // update tracker's nomination, votes and accepted both should be updated
