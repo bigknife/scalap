@@ -92,9 +92,10 @@ trait EnvelopeProcessHelper[F[_]] {
 
   }
 
-  def attemptPreparedAccept[M <: BallotMessage](tracker: BallotTracker,
-                                                quorumSet: QuorumSet,
-                                                hint: BallotStatement[M]): SP[F, BallotTracker] = {
+  def attemptPreparedAccept[M <: BallotMessage](
+      tracker: BallotTracker,
+      quorumSet: QuorumSet,
+      hint: BallotStatement[M]): SP[F, Delta[BallotTracker]] = {
     //todo: if not in prepare or confirm phase, ignore it.
     // we should do some filtering work. to reduce the ballots that can't help local to advance.
     val candidates: Vector[Ballot] = getPreparedCandidateBallots(tracker, hint).toVector.filter {
@@ -147,16 +148,38 @@ trait EnvelopeProcessHelper[F[_]] {
     // if acceptedOpt is defined try to accept prepared
     for {
       acceptedOpt <- acceptedOptSP
-      trackerD <- ifM[Delta[BallotTracker]](Delta.unchanged(tracker), _ => acceptedOpt.isDefined) {_ =>
-        for {
-          trackerD0 <- ballotService.setPrepared(tracker, acceptedOpt.get)
-          trackerD1 <- ballotService.clearCommitIfNeeded(trackerD0.data)
-        } yield Delta(trackerD1.data, trackerD1.changed || trackerD0.changed)
+      trackerD <- ifM[Delta[BallotTracker]](Delta.unchanged(tracker), _ => acceptedOpt.isDefined) {
+        _ =>
+          for {
+            trackerD0 <- ballotService.setPrepared(tracker, acceptedOpt.get)
+            trackerD1 <- ballotService.clearCommitIfNeeded(trackerD0.data)
+          } yield Delta(trackerD1.data, trackerD1.changed || trackerD0.changed)
       }
-      trackerFinal <- ifM[BallotTracker](trackerD.data, _ => trackerD.changed) {x =>
-        emitCurrentStateStatement(x)
+      trackerFinal <- ifM[Delta[BallotTracker]](trackerD, _ => trackerD.changed) { x =>
+        emitCurrentStateStatement(x.data)
       }
     } yield trackerFinal
+  }
+
+  def attemptPreparedConfirm[M <: BallotMessage](
+      tracker: BallotTracker,
+      quorumSet: QuorumSet,
+      hint: BallotStatement[M]): SP[F, Delta[BallotTracker]] = {
+    ???
+  }
+
+  def attemptCommitAccept[M <: BallotMessage](
+      tracker: BallotTracker,
+      quorumSet: QuorumSet,
+      hint: BallotStatement[M]): SP[F, Delta[BallotTracker]] = {
+    ???
+  }
+
+  def attemptCommitConfirm[M <: BallotMessage](
+      tracker: BallotTracker,
+      quorumSet: QuorumSet,
+      hint: BallotStatement[M]): SP[F, Delta[BallotTracker]] = {
+    ???
   }
 
   /**
@@ -165,9 +188,17 @@ trait EnvelopeProcessHelper[F[_]] {
     * @param tracker
     * @return
     */
-  def advanceSlot[M <: BallotMessage](statement: BallotStatement[M],
-                                      tracker: BallotTracker): SP[F, BallotTracker] = {
-    ???
+  def advanceSlot[M <: BallotMessage](tracker: BallotTracker,
+                                      quorumSet: QuorumSet,
+                                      statement: BallotStatement[M]): SP[F, BallotTracker] = {
+    //todo: attempt to bump state
+    //todo: send latest envelope(if not sent)
+    for {
+      pa <- attemptPreparedAccept(tracker, quorumSet, statement)
+      pc <- attemptPreparedConfirm(pa.data, quorumSet, statement)
+      ca <- attemptCommitAccept(pc.data, quorumSet, statement)
+      cc <- attemptCommitConfirm(ca.data, quorumSet, statement)
+    } yield cc.data
   }
 
   def recordEnvelope[M <: BallotMessage](tracker: BallotTracker,
@@ -179,5 +210,5 @@ trait EnvelopeProcessHelper[F[_]] {
 
   def getWorkingBallot[M <: BallotMessage](statement: BallotStatement[M]): SP[F, Ballot] = ???
 
-  def emitCurrentStateStatement(tracker: BallotTracker): SP[F, BallotTracker] = ???
+  def emitCurrentStateStatement(tracker: BallotTracker): SP[F, Delta[BallotTracker]] = ???
 }

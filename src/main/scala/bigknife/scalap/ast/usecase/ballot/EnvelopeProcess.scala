@@ -42,7 +42,7 @@ trait EnvelopeProcess[F[_]] extends BallotCore[F] {
             qSet <- nodeStore.getQuorumSet(nodeID)
             trackerWithState <- if (tracker.phase.notExternalize) for {
               trackerD11 <- recordEnvelope(tracker, envelope)
-              trackerD12 <- self.advanceSlot(statement, trackerD11)
+              trackerD12 <- self.advanceSlot(trackerD11, qSet, statement)
             } yield (trackerD12, Envelope.State.valid)
             else
               for {
