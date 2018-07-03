@@ -87,6 +87,14 @@ private[service] class BallotServiceHandler extends BallotService.Handler[Stack]
         }
       } else Delta.changed(tracker.copy(prepared = ballot))
     }
+
+  override def clearCommitIfNeeded(tracker: BallotTracker): Stack[Delta[BallotTracker]] = Stack {
+    if (tracker.commitBallotNotNull && tracker.highBallotNotNull &&
+      ((tracker.preparedBallotNotNull && tracker.high.lessAndIncompatible(tracker.prepared)) ||
+        (tracker.preparedPrimeBallotNotNull && tracker.high.lessAndIncompatible(tracker.preparedPrime)))) {
+      Delta.changed(tracker.copy(commit = Ballot.Null))
+    } else Delta.unchanged(tracker)
+  }
 }
 
 object BallotServiceHandler {

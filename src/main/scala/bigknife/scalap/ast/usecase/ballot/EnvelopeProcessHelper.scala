@@ -208,7 +208,13 @@ trait EnvelopeProcessHelper[F[_]] {
       _ <- nodeStore.saveHistoricalStatement(envelope.statement)
     } yield t
 
-  def getWorkingBallot[M <: BallotMessage](statement: BallotStatement[M]): SP[F, Ballot] = ???
+  def getWorkingBallot[M <: BallotMessage](statement: BallotStatement[M]): SP[F, Ballot] = {
+    statement.message match {
+      case x: Message.Prepare => x.ballot.pureSP[F]
+      case x: Message.Commit => Ballot(x.cCounter, x.ballot.value).pureSP[F]
+      case x: Message.Externalize => x.commit.pureSP[F]
+    }
+  }
 
   def emitCurrentStateStatement(tracker: BallotTracker): SP[F, Delta[BallotTracker]] = ???
 }
