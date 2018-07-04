@@ -97,69 +97,75 @@ trait EnvelopeProcessHelper[F[_]] extends BallotBaseHelper[F] {
       tracker: BallotTracker,
       quorumSet: QuorumSet,
       hint: BallotStatement[M]): SP[F, Delta[BallotTracker]] = {
-    //todo: if not in prepare or confirm phase, ignore it.
-    // we should do some filtering work. to reduce the ballots that can't help local to advance.
-    val candidates: Vector[Ballot] = getPreparedCandidateBallots(tracker, hint).toVector.filter {
-      b =>
-        val cond1 = tracker.isCommitPhase && !tracker.prepared.lessAndCompatible(b)
-        val cond2 = tracker.preparedPrimeBallotNotNull && (b <= tracker.preparedPrime)
-        val cond3 = tracker.preparedBallotNotNull && b.lessAndCompatible(tracker.prepared)
-        !(cond1 || cond2 || cond3)
-    }.sorted
+    //if not in prepare or confirm phase, ignore it.
+    if (tracker.phase == Phase.Externalize) Delta.unchanged(tracker).pureSP[F]
+    else {
+      // we should do some filtering work. to reduce the ballots that can't help local to advance.
+      val candidates: Vector[Ballot] = getPreparedCandidateBallots(tracker, hint).toVector.filter {
+        b =>
+          val cond1 = tracker.isCommitPhase && !tracker.prepared.lessAndCompatible(b)
+          val cond2 = tracker.preparedPrimeBallotNotNull && (b <= tracker.preparedPrime)
+          val cond3 = tracker.preparedBallotNotNull && b.lessAndCompatible(tracker.prepared)
+          !(cond1 || cond2 || cond3)
+      }.sorted
 
-    // now, find a passed federated-accepted ballot to advance local
-    val BREAK     = true
-    val NOT_BREAK = false
-    def votedPredict(ballot: Ballot): StatementPredicate[Message.BallotMessage] = { x =>
-      x.message match {
-        case m: Message.Prepare     => ballot.lessAndCompatible(m.ballot)
-        case m: Message.Commit      => ballot.compatible(m.ballot)
-        case m: Message.Externalize => ballot.compatible(m.commit)
-      }
-    }
-    def acceptedPredict(ballot: Ballot): StatementPredicate[Message.BallotMessage] = { x =>
-      x.message match {
-        case m: Message.Prepare =>
-          (m.prepared.notNull && ballot.lessAndCompatible(m.prepared)) ||
-            (m.preparedPrime.notNull && ballot.lessAndCompatible(m.preparedPrime))
-        case m: Message.Commit =>
-          val prepared = Ballot(m.preparedCounter, m.ballot.value)
-          ballot.lessAndCompatible(prepared)
-        case m: Message.Externalize =>
-          ballot.compatible(m.commit)
-      }
-    }
-    val acceptedOptSP: SP[F, Option[Ballot]] =
-      candidates
-        .foldRight((Option.empty[Ballot], NOT_BREAK).pureSP[F]) { (n, acc) =>
-          for {
-            pre <- acc
-            x <- ifM[(Option[Ballot], Boolean)](pre, !_._2) { _ =>
-              for {
-                passed <- federatedAccept(quorumSet,
-                                          tracker.latestBallotEnvelope,
-                                          votedPredict(n),
-                                          acceptedPredict(n))
-              } yield if (passed) (Option(n), BREAK) else pre
-            }
-          } yield pre
+      // now, find a passed federated-accepted ballot to advance local
+      val BREAK = true
+      val NOT_BREAK = false
+
+      def votedPredict(ballot: Ballot): StatementPredicate[Message.BallotMessage] = { x =>
+        x.message match {
+          case m: Message.Prepare => ballot.lessAndCompatible(m.ballot)
+          case m: Message.Commit => ballot.compatible(m.ballot)
+          case m: Message.Externalize => ballot.compatible(m.commit)
         }
-        .map(_._1)
+      }
 
-    // if acceptedOpt is defined try to accept prepared
-    for {
-      acceptedOpt <- acceptedOptSP
-      trackerD <- ifM[Delta[BallotTracker]](Delta.unchanged(tracker), _ => acceptedOpt.isDefined) {
-        _ =>
-          for {
-            trackerD0 <- ballotService.setPrepared(tracker, acceptedOpt.get)
-            trackerD1 <- ballotService.clearCommitIfNeeded(trackerD0.data)
-          } yield Delta(trackerD1.data, trackerD1.changed || trackerD0.changed)
+      def acceptedPredict(ballot: Ballot): StatementPredicate[Message.BallotMessage] = { x =>
+        x.message match {
+          case m: Message.Prepare =>
+            (m.prepared.notNull && ballot.lessAndCompatible(m.prepared)) ||
+              (m.preparedPrime.notNull && ballot.lessAndCompatible(m.preparedPrime))
+          case m: Message.Commit =>
+            val prepared = Ballot(m.preparedCounter, m.ballot.value)
+            ballot.lessAndCompatible(prepared)
+          case m: Message.Externalize =>
+            ballot.compatible(m.commit)
+        }
       }
-      trackerFinal <- ifM[Delta[BallotTracker]](trackerD, _ => trackerD.changed) { x =>
-        emitCurrentStateStatement(x.data, quorumSet)
-      }
-    } yield trackerFinal
+
+      val acceptedOptSP: SP[F, Option[Ballot]] =
+        candidates
+          .foldRight((Option.empty[Ballot], NOT_BREAK).pureSP[F]) { (n, acc) =>
+            for {
+              pre <- acc
+              x <- ifM[(Option[Ballot], Boolean)](pre, !_._2) { _ =>
+                for {
+                  passed <- federatedAccept(quorumSet,
+                    tracker.latestBallotEnvelope,
+                    votedPredict(n),
+                    acceptedPredict(n))
+                } yield if (passed) (Option(n), BREAK) else pre
+              }
+            } yield pre
+          }
+          .map(_._1)
+
+      // if acceptedOpt is defined try to accept prepared
+      for {
+        acceptedOpt <- acceptedOptSP
+        trackerD <- ifM[Delta[BallotTracker]](Delta.unchanged(tracker), _ => acceptedOpt.isDefined) {
+          _ =>
+            for {
+              trackerD0 <- ballotService.setPrepared(tracker, acceptedOpt.get)
+              trackerD1 <- ballotService.clearCommitIfNeeded(trackerD0.data)
+            } yield Delta(trackerD1.data, trackerD1.changed || trackerD0.changed)
+        }
+        trackerFinal <- ifM[Delta[BallotTracker]](trackerD, _ => trackerD.changed) { x =>
+          emitCurrentStateStatement(x.data, quorumSet)
+        }
+      } yield trackerFinal
+    }
   }
 
   private def attemptPreparedConfirm[M <: BallotMessage](
