@@ -6,6 +6,7 @@ package bigknife.scalap.ast.types
 case class NominateTracker(
     nodeID: NodeID,
     slotIndex: SlotIndex,
+    nominationStarted: Boolean,
     round: Int,
     roundLeaders: Set[NodeID],
     previousValue: Value,

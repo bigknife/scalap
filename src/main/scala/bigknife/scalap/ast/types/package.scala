@@ -1,5 +1,7 @@
 package bigknife.scalap.ast
 
+import bigknife.sop.SP
+
 package object types {
   type ValueSet = LinkedHashSet[Value]
   object ValueSet {
@@ -17,14 +19,14 @@ package object types {
   type NominationEnvelope       = Envelope[Message.Nomination]
   type NominationEnvelopeResult = BoolResult[NominationEnvelope]
 
-  type BallotMessage = Message.BallotMessage
-  type BallotEnvelope[+M <: BallotMessage] = Envelope.BallotEnvelope[M]
+  type BallotMessage                        = Message.BallotMessage
+  type BallotEnvelope[+M <: BallotMessage]  = Envelope.BallotEnvelope[M]
   type BallotStatement[+M <: BallotMessage] = Statement.BallotStatement[M]
-
 
   type NominationStatement = Statement[Message.Nomination]
 
   type Predicate[A]                     = A => Boolean
+  type SPPredicate[F[_], A]             = A => SP[F, Boolean]
   type StatementPredicate[M <: Message] = Predicate[Statement[M]]
 
   type BallotPhase = BallotTracker.Phase

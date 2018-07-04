@@ -79,4 +79,11 @@ import bigknife.sop.implicits._
     * @return
     */
   def combineValues(valueSet: ValueSet): P[F, Value]
+
+  /**
+    * stop nomination, set nominating flat to false
+    * @param tracker
+    * @return
+    */
+  def stopNomination(tracker: NominateTracker): P[F, NominateTracker]
 }

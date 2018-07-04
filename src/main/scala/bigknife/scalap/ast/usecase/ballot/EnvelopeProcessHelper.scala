@@ -1,9 +1,8 @@
 package bigknife.scalap.ast.usecase.ballot
 
-import bigknife.scalap.ast
-import bigknife.scalap.ast.types
 import bigknife.scalap.ast.types.BallotTracker.Phase
 import bigknife.scalap.ast.types._
+import bigknife.scalap.ast.types.implicits._
 import bigknife.scalap.ast.usecase.{ConvenienceSupport, ModelSupport}
 import bigknife.sop._
 import bigknife.sop.implicits._
@@ -305,37 +304,11 @@ trait EnvelopeProcessHelper[F[_]] extends BallotBaseHelper[F] {
   private def findExtendedInterval(tracker: BallotTracker,
                                    quorumSet: QuorumSet,
                                    boundaries: Set[Int],
-                                   ballot: Ballot): SP[F, Interval] = {
+                                   predicate: SPPredicate[F, Interval]): SP[F, Interval] = {
     // sorted
     val sorted   = boundaries.toVector.sorted
     val BREAK    = true
     val NO_BREAK = false
-    def pred(interval: Interval): SP[F, Boolean] = {
-      val votedPredict: Predicate[Statement[BallotMessage]] = { x =>
-        x.message match {
-          case y: Message.Prepare =>
-            ballot.compatible(y.ballot) &&
-              y.cCounter != 0 &&
-              (y.cCounter <= interval.first && interval.second <= y.hCounter)
-          case y: Message.Commit =>
-            ballot.compatible(y.ballot) && y.cCounter <= interval.first
-          case y: Message.Externalize =>
-            ballot.compatible(y.commit) && y.commit.counter <= interval.first
-        }
-      }
-      val acceptedPredict: Predicate[Statement[BallotMessage]] = { x =>
-        x.message match {
-          case y: Message.Prepare => false
-          case y: Message.Commit =>
-            ballot.compatible(y.ballot) &&
-              (y.cCounter <= interval.first && interval.second <= y.hCounter)
-          case y: Message.Externalize =>
-            ballot.compatible(y.commit) && y.commit.counter <= interval.first
-        }
-      }
-
-      federatedAccept(quorumSet, tracker.latestBallotEnvelope, votedPredict, acceptedPredict)
-    }
 
     sorted
       .foldRight((Interval(0, 0), NO_BREAK).pureSP[F]) { (n, acc) =>
@@ -344,7 +317,7 @@ trait EnvelopeProcessHelper[F[_]] extends BallotBaseHelper[F] {
           x <- ifM[(Interval, Boolean)](pre, !_._2) { _ =>
             val cur = if (pre._1.bothZero) pre._1.setBoth(n) else pre._1.shiftLeft(n)
             for {
-              b <- pred(cur)
+              b <- predicate(cur)
             } yield if (b) (cur, NO_BREAK) else (pre._1, BREAK)
           }
         } yield pre
@@ -380,11 +353,27 @@ trait EnvelopeProcessHelper[F[_]] extends BallotBaseHelper[F] {
                 trackerD10 <- ifM[Delta[BallotTracker]](trackerD0, _ => shouldBump) { _ =>
                   bumpToBallot(tracker, h, check = false)
                 }
-                trackerD11 <- Delta.changed(
-                  trackerD10.data.copy(phase = Phase.Commit, preparedPrime = Ballot.Null)).pureSP[F]
+                trackerD11 <- Delta
+                  .changed(trackerD10.data.copy(phase = Phase.Commit, preparedPrime = Ballot.Null))
+                  .pureSP[F]
               } yield trackerD11
           }
         } yield trackerD1
+    }
+  }
+
+  private def setCommitConfirm(tracker: BallotTracker, quorumSet: QuorumSet, candidate: Interval, ballot: Ballot): SP[F, Delta[BallotTracker]] = {
+    ifM[Delta[BallotTracker]](tracker.unchanged, _ => candidate.first > 0) {_ =>
+      val c = Ballot(candidate.first, ballot.value)
+      val h = Ballot(candidate.second, ballot.value)
+      val trackerUpdated = tracker.copy(commit = c, high = h)
+      for {
+        trackerD0 <- updateCurrentIfNeeded(trackerUpdated)
+        trackerD1 <- emitCurrentStateStatement(trackerD0.data.copy(phase = Phase.Externalize), quorumSet)
+        nominateTracker <- nodeStore.getNominateTracker(tracker.nodeID, tracker.slotIndex)
+        _ <- nominateService.stopNomination(nominateTracker)
+        _ <- nodeStore.saveNominateTracker(tracker.nodeID, nominateTracker)
+      } yield trackerD1
     }
   }
 
@@ -399,11 +388,38 @@ trait EnvelopeProcessHelper[F[_]] extends BallotBaseHelper[F] {
     val ballot     = getAcceptCommitBallots(tracker, hint)
     val comp       = if (tracker.isCommitPhase) ballot.compatible(tracker.high) else true
     val boundaries = getCommitBoundariesFromStatements(tracker, ballot)
+    def pred(interval: Interval): SP[F, Boolean] = {
+      val votedPredict: Predicate[Statement[BallotMessage]] = { x =>
+        x.message match {
+          case y: Message.Prepare =>
+            ballot.compatible(y.ballot) &&
+              y.cCounter != 0 &&
+              (y.cCounter <= interval.first && interval.second <= y.hCounter)
+          case y: Message.Commit =>
+            ballot.compatible(y.ballot) && y.cCounter <= interval.first
+          case y: Message.Externalize =>
+            ballot.compatible(y.commit) && y.commit.counter <= interval.first
+        }
+      }
+      val acceptedPredict: Predicate[Statement[BallotMessage]] = { x =>
+        x.message match {
+          case y: Message.Prepare => false
+          case y: Message.Commit =>
+            ballot.compatible(y.ballot) &&
+              (y.cCounter <= interval.first && interval.second <= y.hCounter)
+          case y: Message.Externalize =>
+            ballot.compatible(y.commit) && y.commit.counter <= interval.first
+        }
+      }
+
+      federatedAccept(quorumSet, tracker.latestBallotEnvelope, votedPredict, acceptedPredict)
+    }
+
     ifM[Delta[BallotTracker]](
       Delta.unchanged(tracker),
       _ => tracker.notExternalizePhase && ballot.notNull && comp && boundaries.nonEmpty) { _ =>
       for {
-        interval  <- findExtendedInterval(tracker, quorumSet, boundaries, ballot)
+        interval  <- findExtendedInterval(tracker, quorumSet, boundaries, pred)
         trackerD0 <- setCommitAccept(tracker, interval, ballot)
         trackerD1 <- updateCurrentIfNeeded(trackerD0.data)
         trackerD2 <- emitCurrentStateStatement(trackerD1.data, quorumSet)
@@ -411,17 +427,58 @@ trait EnvelopeProcessHelper[F[_]] extends BallotBaseHelper[F] {
     }
   }
 
+  private def getCommitConfirmBallot[M <: BallotMessage](hint: BallotStatement[M]): Ballot = {
+    hint.message match {
+      case _: Message.Prepare     => Ballot.Null // should be ignored
+      case x: Message.Commit      => Ballot(x.hCounter, x.ballot.value)
+      case x: Message.Externalize => Ballot(x.hCounter, x.commit.value)
+    }
+  }
+
   private def attemptCommitConfirm[M <: BallotMessage](
       tracker: BallotTracker,
       quorumSet: QuorumSet,
       hint: BallotStatement[M]): SP[F, Delta[BallotTracker]] = {
-    ???
+    // should be commit phase
+    val shouldBeCommit = tracker.phase.isCommit
+    // high and commit should not be null
+    val highAndCommitShouldNotBeNull = tracker.highBallotNotNull && tracker.commitBallotNotNull
+    // hint should not be prepare msg
+    val ballot                 = getCommitConfirmBallot(hint)
+    val ballotShouldNotBeNull  = ballot.notNull
+    val ballotCompatibleCommit = ballot.compatible(tracker.commit)
+    val boundaries             = getCommitBoundariesFromStatements(tracker, ballot)
+    val pred: SPPredicate[F, Interval] = { check =>
+      val commitPredict: Predicate[Statement[BallotMessage]] = { x =>
+        x.message match {
+          case _: Message.Prepare => false
+          case y: Message.Commit =>
+            ballot.compatible(y.ballot) &&
+              (y.cCounter <= check.first && check.second <= y.hCounter)
+          case y: Message.Externalize =>
+            ballot.compatible(y.commit) && y.commit.counter <= check.first
+        }
+        true
+      }
+      federatedRatify(quorumSet, tracker.latestBallotEnvelope, commitPredict)
+    }
+
+    ifM[Delta[BallotTracker]](
+      tracker.unchanged,
+      _ =>
+        shouldBeCommit && highAndCommitShouldNotBeNull &&
+          ballotShouldNotBeNull && ballotCompatibleCommit && boundaries.nonEmpty) { _ =>
+      for {
+        interval <- findExtendedInterval(tracker, quorumSet, boundaries, pred)
+        trackerD0 <- setCommitConfirm(tracker, quorumSet, interval, ballot)
+      } yield trackerD0
+    }
   }
 
   /**
     * advance the slot
-    * @param statement
-    * @param tracker
+    * @param statement statement
+    * @param tracker tracker
     * @return
     */
   def advanceSlot[M <: BallotMessage](tracker: BallotTracker,

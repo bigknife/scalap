@@ -155,6 +155,10 @@ class NominateServiceHandler extends NominateService.Handler[Stack] {
   override def combineValues(valueSet: ValueSet): Stack[Value] = Stack {setting =>
     setting.connect.combineValues(valueSet)
   }
+
+  override def stopNomination(tracker: NominateTracker): Stack[NominateTracker] = Stack {
+    tracker.copy(nominationStarted = false)
+  }
 }
 
 object NominateServiceHandler {
