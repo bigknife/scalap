@@ -75,7 +75,8 @@ private[service] class BallotServiceHandler extends BallotService.Handler[Stack]
       }
   }
 
-  override def setPrepared(tracker: BallotTracker, ballot: Ballot): Stack[Delta[BallotTracker]] =
+  override def setPreparedAccepted(tracker: BallotTracker,
+                                   ballot: Ballot): Stack[Delta[BallotTracker]] =
     Stack {
       if (tracker.prepared.notNull) {
         if (tracker.prepared < ballot) {
@@ -89,6 +90,20 @@ private[service] class BallotServiceHandler extends BallotService.Handler[Stack]
         }
       } else Delta.changed(tracker.copy(prepared = ballot))
     }
+
+  override def setPreparedCommitted(tracker: BallotTracker,
+                                    commitBallot: Ballot,
+                                    highBallot: Ballot): Stack[Delta[BallotTracker]] = Stack {
+    setting =>
+      val hChanged = tracker.highBallotIsNull || highBallot > tracker.high
+      val cChanged = commitBallot.notNull
+      val changed  = hChanged || cChanged
+      if (changed) {
+        val t1 = if (hChanged) tracker.copy(high = highBallot) else tracker
+        val t2 = if (cChanged) t1.copy(commit = commitBallot) else t1
+        Delta.changed(t2)
+      } else Delta.unchanged(tracker)
+  }
 
   override def clearCommitIfNeeded(tracker: BallotTracker): Stack[Delta[BallotTracker]] = Stack {
     if (tracker.commitBallotNotNull && tracker.highBallotNotNull &&

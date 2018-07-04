@@ -19,7 +19,7 @@ trait BallotBaseHelper[F[_]] {
 
     def hasProcessed(msg: BallotEnvelope[BallotMessage]): Boolean =
       tracker.latestBallotEnvelope.exists {
-        case (nodeId, env) => nodeId == tracker.nodeID && env.statement == msg
+        case (nodeId, env) => nodeId == tracker.nodeID && env == msg
       }
 
     for {

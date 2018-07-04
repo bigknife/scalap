@@ -52,12 +52,11 @@ trait EnvelopeProcessHelper[F[_]] extends BallotBaseHelper[F] {
 
   /**
     * get candidates ballots for prepare phase
-    * @param tracker
-    * @param statement
-    * @tparam M
+    * @param tracker tracker
+    * @param statement statement
     * @return
     */
-  def getPreparedCandidateBallots[M <: BallotMessage](
+  private def getPreparedCandidateBallots[M <: BallotMessage](
       tracker: BallotTracker,
       statement: BallotStatement[M]): Set[Ballot] = {
     // get ballots from statement, if the statement is commit or externalize, let the ballot value be
@@ -93,12 +92,22 @@ trait EnvelopeProcessHelper[F[_]] extends BallotBaseHelper[F] {
 
   }
 
+  private def getAcceptCommitBallots[M <: BallotMessage](tracker: BallotTracker,
+                                                         statement: BallotStatement[M]): Ballot = {
+    statement.message match {
+      case x: Message.Prepare =>
+        if (x.cCounter != 0) Ballot(x.hCounter, x.ballot.value) else Ballot.Null
+      case x: Message.Commit      => Ballot(x.hCounter, x.ballot.value)
+      case x: Message.Externalize => Ballot(x.hCounter, x.commit.value)
+    }
+  }
+
   private def attemptPreparedAccept[M <: BallotMessage](
       tracker: BallotTracker,
       quorumSet: QuorumSet,
       hint: BallotStatement[M]): SP[F, Delta[BallotTracker]] = {
     //if not in prepare or confirm phase, ignore it.
-    if (tracker.phase == Phase.Externalize) Delta.unchanged(tracker).pureSP[F]
+    if (tracker.isExternalizePhase) Delta.unchanged(tracker).pureSP[F]
     else {
       // we should do some filtering work. to reduce the ballots that can't help local to advance.
       val candidates: Vector[Ballot] = getPreparedCandidateBallots(tracker, hint).toVector.filter {
@@ -110,13 +119,13 @@ trait EnvelopeProcessHelper[F[_]] extends BallotBaseHelper[F] {
       }.sorted
 
       // now, find a passed federated-accepted ballot to advance local
-      val BREAK = true
+      val BREAK     = true
       val NOT_BREAK = false
 
       def votedPredict(ballot: Ballot): StatementPredicate[Message.BallotMessage] = { x =>
         x.message match {
-          case m: Message.Prepare => ballot.lessAndCompatible(m.ballot)
-          case m: Message.Commit => ballot.compatible(m.ballot)
+          case m: Message.Prepare     => ballot.lessAndCompatible(m.ballot)
+          case m: Message.Commit      => ballot.compatible(m.ballot)
           case m: Message.Externalize => ballot.compatible(m.commit)
         }
       }
@@ -142,12 +151,12 @@ trait EnvelopeProcessHelper[F[_]] extends BallotBaseHelper[F] {
               x <- ifM[(Option[Ballot], Boolean)](pre, !_._2) { _ =>
                 for {
                   passed <- federatedAccept(quorumSet,
-                    tracker.latestBallotEnvelope,
-                    votedPredict(n),
-                    acceptedPredict(n))
+                                            tracker.latestBallotEnvelope,
+                                            votedPredict(n),
+                                            acceptedPredict(n))
                 } yield if (passed) (Option(n), BREAK) else pre
               }
-            } yield pre
+            } yield x
           }
           .map(_._1)
 
@@ -157,7 +166,7 @@ trait EnvelopeProcessHelper[F[_]] extends BallotBaseHelper[F] {
         trackerD <- ifM[Delta[BallotTracker]](Delta.unchanged(tracker), _ => acceptedOpt.isDefined) {
           _ =>
             for {
-              trackerD0 <- ballotService.setPrepared(tracker, acceptedOpt.get)
+              trackerD0 <- ballotService.setPreparedAccepted(tracker, acceptedOpt.get)
               trackerD1 <- ballotService.clearCommitIfNeeded(trackerD0.data)
             } yield Delta(trackerD1.data, trackerD1.changed || trackerD0.changed)
         }
@@ -172,14 +181,234 @@ trait EnvelopeProcessHelper[F[_]] extends BallotBaseHelper[F] {
       tracker: BallotTracker,
       quorumSet: QuorumSet,
       hint: BallotStatement[M]): SP[F, Delta[BallotTracker]] = {
-    ???
+    // if not in prepare phase, ignore it
+    // if not accepted prepared, can't to confirm it
+    if (tracker.notPreparePhase || tracker.preparedBallotIsNull) Delta.unchanged(tracker).pureSP[F]
+    else {
+      val candidates = getPreparedCandidateBallots(tracker, hint).toVector.sorted
+
+      def acceptedPredict(ballot: Ballot): StatementPredicate[Message.BallotMessage] = { x =>
+        x.message match {
+          case m: Message.Prepare =>
+            (m.prepared.notNull && ballot.lessAndCompatible(m.prepared)) ||
+              (m.preparedPrime.notNull && ballot.lessAndCompatible(m.preparedPrime))
+          case m: Message.Commit =>
+            val prepared = Ballot(m.preparedCounter, m.ballot.value)
+            ballot.lessAndCompatible(prepared)
+          case m: Message.Externalize =>
+            ballot.compatible(m.commit)
+        }
+      }
+      val BREAK    = true
+      val NO_BREAK = false
+      val newHightBallotOptSP: SP[F, Option[Ballot]] =
+        candidates
+          .foldRight((Option.empty[Ballot], NO_BREAK).pureSP[F]) { (n, acc) =>
+            // if local high is ge than all other nodes accepted, passed
+            val isBreak = tracker.highBallotNotNull && tracker.high >= n
+            for {
+              pre <- acc
+              x <- ifM[(Option[Ballot], Boolean)](pre, !_._2 && !isBreak) { _ =>
+                for {
+                  ratified <- federatedRatify(quorumSet,
+                                              tracker.latestBallotEnvelope,
+                                              acceptedPredict(n))
+                } yield if (ratified) (Option(n), BREAK) else pre
+              }
+            } yield x
+          }
+          .map(_._1)
+
+      // if newH has been found , continue to find newC, then set confirmed, or nothing to do
+      // find from the rest (drop high and higher)
+      def newCommitBallotOptSP(high: Ballot): SP[F, Option[Ballot]] = {
+        val rest = candidates.dropWhile(b => b >= high)
+        // h should > p and p'
+        val p = tracker.commitBallotIsNull &&
+          (tracker.preparedBallotIsNull || !high.lessAndIncompatible(tracker.prepared)) &&
+          (tracker.preparedPrimeBallotIsNull || !high.lessAndIncompatible(tracker.preparedPrime))
+
+        ifM[Option[Ballot]](Option.empty[Ballot], _ => p) { _ =>
+          rest
+            .foldRight((Option.empty[Ballot], NO_BREAK).pureSP[F]) { (n, acc) =>
+              val isBreak = n < tracker.current.ifNullThen(Ballot.Null)
+              for {
+                pre <- acc
+                x <- ifM[(Option[Ballot], Boolean)](pre, !_._2 && !isBreak) { _ =>
+                  for {
+                    ratified <- federatedRatify(quorumSet,
+                                                tracker.latestBallotEnvelope,
+                                                acceptedPredict(n))
+                  } yield if (ratified) (Option(n), BREAK) else pre
+                }
+              } yield x
+            }
+            .map(_._1)
+        }
+      }
+
+      for {
+        newHOpt <- newHightBallotOptSP
+        trackerD0 <- ifM[Delta[BallotTracker]](Delta.unchanged(tracker), _ => newHOpt.isDefined) {
+          _ =>
+            for {
+              newCOpt <- newCommitBallotOptSP(newHOpt.get)
+              trackerD00 <- ballotService.setPreparedCommitted(tracker,
+                                                               newCOpt.getOrElse(Ballot.Null),
+                                                               newHOpt.get)
+            } yield trackerD00
+        }
+        trackerD1 <- ifM[Delta[BallotTracker]](trackerD0, _.changed) { _ =>
+          for {
+            trackerD10 <- updateCurrentIfNeeded(trackerD0.data)
+            trackerD11 <- emitCurrentStateStatement(tracker, quorumSet)
+          } yield trackerD11
+        }
+
+      } yield trackerD1
+    }
+  }
+
+  private def updateCurrentIfNeeded(tracker: BallotTracker): SP[F, Delta[BallotTracker]] = {
+    if (tracker.currentBallotIsNull || tracker.current < tracker.high) {
+      bumpToBallot(tracker, tracker.high, check = true)
+    } else Delta.unchanged(tracker).pureSP[F]
+  }
+  private def bumpToBallot(tracker: BallotTracker,
+                           ballot: Ballot,
+                           check: Boolean): SP[F, Delta[BallotTracker]] = {
+    require(tracker.currentBallotIsNull || ballot >= tracker.current)
+    val bumped = tracker.currentBallotIsNull || tracker.current.counter != ballot.counter
+    val t1     = tracker.copy(current = ballot)
+    (if (bumped) Delta.changed(t1.copy(heardFromQuorum = true))
+     else Delta.changed(t1)).pureSP[F]
+
+  }
+
+  private def getCommitBoundariesFromStatements(tracker: BallotTracker,
+                                                ballot: Ballot): Set[Int] = {
+    tracker.latestBallotEnvelope.foldLeft(Set.empty[Int]) {
+      case (acc, (nodeId, envelope)) =>
+        envelope.statement.message match {
+          case x: Message.Prepare =>
+            if (ballot.compatible(x.ballot) && x.cCounter > 0) acc + x.cCounter + x.hCounter
+            else acc
+          case x: Message.Commit =>
+            if (ballot.compatible(x.ballot)) acc + x.cCounter + x.hCounter else acc
+          case x: Message.Externalize =>
+            if (ballot.compatible(x.commit)) acc + x.commit.counter + x.hCounter + Int.MaxValue
+            else acc
+        }
+    }
+  }
+
+  private def findExtendedInterval(tracker: BallotTracker,
+                                   quorumSet: QuorumSet,
+                                   boundaries: Set[Int],
+                                   ballot: Ballot): SP[F, Interval] = {
+    // sorted
+    val sorted   = boundaries.toVector.sorted
+    val BREAK    = true
+    val NO_BREAK = false
+    def pred(interval: Interval): SP[F, Boolean] = {
+      val votedPredict: Predicate[Statement[BallotMessage]] = { x =>
+        x.message match {
+          case y: Message.Prepare =>
+            ballot.compatible(y.ballot) &&
+              y.cCounter != 0 &&
+              (y.cCounter <= interval.first && interval.second <= y.hCounter)
+          case y: Message.Commit =>
+            ballot.compatible(y.ballot) && y.cCounter <= interval.first
+          case y: Message.Externalize =>
+            ballot.compatible(y.commit) && y.commit.counter <= interval.first
+        }
+      }
+      val acceptedPredict: Predicate[Statement[BallotMessage]] = { x =>
+        x.message match {
+          case y: Message.Prepare => false
+          case y: Message.Commit =>
+            ballot.compatible(y.ballot) &&
+              (y.cCounter <= interval.first && interval.second <= y.hCounter)
+          case y: Message.Externalize =>
+            ballot.compatible(y.commit) && y.commit.counter <= interval.first
+        }
+      }
+
+      federatedAccept(quorumSet, tracker.latestBallotEnvelope, votedPredict, acceptedPredict)
+    }
+
+    sorted
+      .foldRight((Interval(0, 0), NO_BREAK).pureSP[F]) { (n, acc) =>
+        for {
+          pre <- acc
+          x <- ifM[(Interval, Boolean)](pre, !_._2) { _ =>
+            val cur = if (pre._1.bothZero) pre._1.setBoth(n) else pre._1.shiftLeft(n)
+            for {
+              b <- pred(cur)
+            } yield if (b) (cur, NO_BREAK) else (pre._1, BREAK)
+          }
+        } yield pre
+      }
+      .map(_._1)
+  }
+
+  private def setCommitAccept(tracker: BallotTracker,
+                              candidate: Interval,
+                              ballot: Ballot): SP[F, Delta[BallotTracker]] = {
+    ifM[Delta[BallotTracker]](
+      Delta.unchanged(tracker),
+      _ =>
+        candidate.first > 0 && (tracker.notCommitPhase || tracker.high.counter < candidate.second)) {
+      x =>
+        val c = Ballot(candidate.first, ballot.value)
+        val h = Ballot(candidate.second, ballot.value)
+
+        val shouldSetCommitAndHigh = tracker.highBallotIsNull || tracker.commitBallotIsNull ||
+          tracker.high != h || tracker.commit != c
+
+        val shouldSetPhaseAndPreparedPrime = tracker.isPreparePhase
+
+        for {
+          trackerD0 <- ifM[Delta[BallotTracker]](x, _ => shouldSetCommitAndHigh) { _ =>
+            Delta.changed(tracker.copy(commit = c, high = h)).pureSP[F]
+          }
+          trackerD1 <- ifM[Delta[BallotTracker]](trackerD0, _ => shouldSetPhaseAndPreparedPrime) {
+            _ =>
+              val shouldBump = trackerD0.data.currentBallotNotNull && !h.lessAndCompatible(
+                trackerD0.data.current)
+              for {
+                trackerD10 <- ifM[Delta[BallotTracker]](trackerD0, _ => shouldBump) { _ =>
+                  bumpToBallot(tracker, h, check = false)
+                }
+                trackerD11 <- Delta.changed(
+                  trackerD10.data.copy(phase = Phase.Commit, preparedPrime = Ballot.Null)).pureSP[F]
+              } yield trackerD11
+          }
+        } yield trackerD1
+    }
   }
 
   private def attemptCommitAccept[M <: BallotMessage](
       tracker: BallotTracker,
       quorumSet: QuorumSet,
       hint: BallotStatement[M]): SP[F, Delta[BallotTracker]] = {
-    ???
+    // check if in prepare or commit phase
+    // check the ballot to commit is not null
+    // if current phase is commit, ballot should compatible to high
+    // check boundaries should not be null
+    val ballot     = getAcceptCommitBallots(tracker, hint)
+    val comp       = if (tracker.isCommitPhase) ballot.compatible(tracker.high) else true
+    val boundaries = getCommitBoundariesFromStatements(tracker, ballot)
+    ifM[Delta[BallotTracker]](
+      Delta.unchanged(tracker),
+      _ => tracker.notExternalizePhase && ballot.notNull && comp && boundaries.nonEmpty) { _ =>
+      for {
+        interval  <- findExtendedInterval(tracker, quorumSet, boundaries, ballot)
+        trackerD0 <- setCommitAccept(tracker, interval, ballot)
+        trackerD1 <- updateCurrentIfNeeded(trackerD0.data)
+        trackerD2 <- emitCurrentStateStatement(trackerD1.data, quorumSet)
+      } yield trackerD2
+    }
   }
 
   private def attemptCommitConfirm[M <: BallotMessage](
@@ -222,7 +451,5 @@ trait EnvelopeProcessHelper[F[_]] extends BallotBaseHelper[F] {
       case x: Message.Externalize => x.commit.pureSP[F]
     }
   }
-
-
 
 }
