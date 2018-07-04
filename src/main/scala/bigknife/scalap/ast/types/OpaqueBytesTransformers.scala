@@ -56,4 +56,11 @@ trait OpaqueBytesTransformers {
     OpaqueBytesTransformer[Statement.Externalize] { n =>
       n.nodeID.bytes ++ n.slotIndex.bytes ++ n.quorumSetHash.bytes ++ n.message.hCounter.bytes
     }
+
+  implicit val BallotStatementTransformer: OpaqueBytesTransformer[BallotStatement[BallotMessage]] =
+    OpaqueBytesTransformer[BallotStatement[BallotMessage]] {
+      case x: Statement.Prepare => PrepareStatementBytesTransformer.f(x)
+      case x: Statement.Commit => CommitStatementBytesTransformer.f(x)
+      case x: Statement.Externalize => ExternalizeStatementBytesTransformer.f(x)
+    }
 }

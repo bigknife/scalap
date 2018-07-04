@@ -62,6 +62,13 @@ object Message {
 
   def nominationBuilder(): NominationBuilder = new NominationBuilder
 
+  // null smart constructor
+  def nullPrepare: Message.Prepare = Message.Prepare(
+    Ballot.Null, Ballot.Null, Ballot.Null, 0, 0
+  )
+  def nullCommit: Message.Commit = Message.Commit(Ballot.Null, 0, 0, 0)
+  def nullExternalize: Message.Externalize = Message.Externalize(Ballot.Null, 0)
+
   /////// message ops
   trait Ops {
     implicit final class MessageOps(message: Message) {

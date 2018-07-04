@@ -2,13 +2,14 @@ package bigknife.scalap.ast.usecase.ballot
 
 import bigknife.scalap.ast
 import bigknife.scalap.ast.types
+import bigknife.scalap.ast.types.BallotTracker.Phase
 import bigknife.scalap.ast.types._
 import bigknife.scalap.ast.usecase.{ConvenienceSupport, ModelSupport}
 import bigknife.sop._
 import bigknife.sop.implicits._
 
-trait EnvelopeProcessHelper[F[_]] {
-  self: ModelSupport[F] with ConvenienceSupport[F] =>
+trait EnvelopeProcessHelper[F[_]] extends BallotBaseHelper[F] {
+  self: ModelSupport[F] with ConvenienceSupport[F] with BallotCore[F] =>
   import model._
 
   /**
@@ -92,7 +93,7 @@ trait EnvelopeProcessHelper[F[_]] {
 
   }
 
-  def attemptPreparedAccept[M <: BallotMessage](
+  private def attemptPreparedAccept[M <: BallotMessage](
       tracker: BallotTracker,
       quorumSet: QuorumSet,
       hint: BallotStatement[M]): SP[F, Delta[BallotTracker]] = {
@@ -156,26 +157,26 @@ trait EnvelopeProcessHelper[F[_]] {
           } yield Delta(trackerD1.data, trackerD1.changed || trackerD0.changed)
       }
       trackerFinal <- ifM[Delta[BallotTracker]](trackerD, _ => trackerD.changed) { x =>
-        emitCurrentStateStatement(x.data)
+        emitCurrentStateStatement(x.data, quorumSet)
       }
     } yield trackerFinal
   }
 
-  def attemptPreparedConfirm[M <: BallotMessage](
+  private def attemptPreparedConfirm[M <: BallotMessage](
       tracker: BallotTracker,
       quorumSet: QuorumSet,
       hint: BallotStatement[M]): SP[F, Delta[BallotTracker]] = {
     ???
   }
 
-  def attemptCommitAccept[M <: BallotMessage](
+  private def attemptCommitAccept[M <: BallotMessage](
       tracker: BallotTracker,
       quorumSet: QuorumSet,
       hint: BallotStatement[M]): SP[F, Delta[BallotTracker]] = {
     ???
   }
 
-  def attemptCommitConfirm[M <: BallotMessage](
+  private def attemptCommitConfirm[M <: BallotMessage](
       tracker: BallotTracker,
       quorumSet: QuorumSet,
       hint: BallotStatement[M]): SP[F, Delta[BallotTracker]] = {
@@ -210,11 +211,12 @@ trait EnvelopeProcessHelper[F[_]] {
 
   def getWorkingBallot[M <: BallotMessage](statement: BallotStatement[M]): SP[F, Ballot] = {
     statement.message match {
-      case x: Message.Prepare => x.ballot.pureSP[F]
-      case x: Message.Commit => Ballot(x.cCounter, x.ballot.value).pureSP[F]
+      case x: Message.Prepare     => x.ballot.pureSP[F]
+      case x: Message.Commit      => Ballot(x.cCounter, x.ballot.value).pureSP[F]
       case x: Message.Externalize => x.commit.pureSP[F]
     }
   }
 
-  def emitCurrentStateStatement(tracker: BallotTracker): SP[F, Delta[BallotTracker]] = ???
+
+
 }

@@ -10,7 +10,8 @@ case class BallotTracker(
                           high: Ballot, // h, highest confirmed ballot.counter, if is 0, no confirmed
                           commit: Ballot, // c, lowest confirmed ballot.counter
                           latestBallotEnvelope: Map[NodeID, BallotEnvelope[Message.BallotMessage]], // M
-                          lastSentEnvelope: Option[BallotEnvelope[Message.BallotMessage]],
+                          lastGenEnvelope: Option[BallotEnvelope[Message.BallotMessage]],
+                          lastEmitEnvelope: Option[BallotEnvelope[Message.BallotMessage]],
                           heardFromQuorum: Boolean
 ) {
   def currentBallotIsNull: Boolean = current.isNull
@@ -55,7 +56,7 @@ object BallotTracker {
       override def is(name: String): Boolean = this.name == name
     }
     val Prepare: Phase     = _Phase("Prepare", 1)
-    val Confirm: Phase     = _Phase("Commit", 2)
+    val Commit: Phase     = _Phase("Commit", 2)
     val Externalize: Phase = _Phase("Externalize", 3)
   }
 

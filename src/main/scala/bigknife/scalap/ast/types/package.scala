@@ -18,8 +18,8 @@ package object types {
   type NominationEnvelopeResult = BoolResult[NominationEnvelope]
 
   type BallotMessage = Message.BallotMessage
-  type BallotEnvelope[M <: BallotMessage] = Envelope.BallotEnvelope[M]
-  type BallotStatement[M <: BallotMessage] = Statement.BallotStatement[M]
+  type BallotEnvelope[+M <: BallotMessage] = Envelope.BallotEnvelope[M]
+  type BallotStatement[+M <: BallotMessage] = Statement.BallotStatement[M]
 
 
   type NominationStatement = Statement[Message.Nomination]
@@ -29,7 +29,7 @@ package object types {
 
   type BallotPhase = BallotTracker.Phase
   val ballotPhrasePrepare: BallotPhase     = BallotTracker.Phase.Prepare
-  val ballotPhraseConfirm: BallotPhase     = BallotTracker.Phase.Confirm
+  val ballotPhraseConfirm: BallotPhase     = BallotTracker.Phase.Commit
   val ballotPhraseExternalize: BallotPhase = BallotTracker.Phase.Externalize
 
   object implicits

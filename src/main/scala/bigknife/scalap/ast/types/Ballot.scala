@@ -15,6 +15,8 @@ case class Ballot(counter: Int, value: Value) extends Ordered[Ballot] {
   def incompatible(that: Ballot): Boolean        = this.value != that.value
   def lessAndCompatible(that: Ballot): Boolean   = this <= that && compatible(that)
   def lessAndIncompatible(that: Ballot): Boolean = this <= that && incompatible(that)
+
+  def ifNullThen(other: Ballot): Ballot = if(isNull) other else this
 }
 
 object Ballot {

@@ -8,6 +8,7 @@ import bigknife.sop.macros._
 import bigknife.sop.implicits._
 
 @sp trait BallotService[F[_]] {
+
   /**
     * create an appropriate ballot.
     * if tracker's high ballot is not empty, the coming value is ignored
@@ -23,7 +24,8 @@ import bigknife.sop.implicits._
     * @param envelope envelope
     * @return
     */
-  def recordEnvelope[M <: BallotMessage](tracker: BallotTracker, envelope: BallotEnvelope[M]): P[F, BallotTracker]
+  def recordEnvelope[M <: BallotMessage](tracker: BallotTracker,
+                                         envelope: BallotEnvelope[M]): P[F, BallotTracker]
 
   /**
     * compute timeout in millisecond
@@ -61,4 +63,23 @@ import bigknife.sop.implicits._
     * @return
     */
   def clearCommitIfNeeded(tracker: BallotTracker): P[F, Delta[BallotTracker]]
+
+  /**
+    * create ballot envelope
+    * @param tracker tracker
+    * @param quorumSet quorum set
+    * @return
+    */
+  def createBallotEnvelope(tracker: BallotTracker,
+                           quorumSet: QuorumSet): P[F, BallotEnvelope[BallotMessage]]
+
+  /**
+    * broadcast envelope to peers
+    * @param tracker ballot tracker
+    * @param quorumSet quorum set
+    * @return
+    */
+  def broadcastEnvelope(tracker: BallotTracker,
+                        quorumSet: QuorumSet,
+                        envelope: BallotEnvelope[BallotMessage]): P[F, Delta[BallotTracker]]
 }

@@ -7,13 +7,10 @@ sealed trait Statement[+M <: Message] {
   def slotIndex: SlotIndex // i, slot index
   def quorumSetHash: Hash  // D, hash of quorum set
   def message: M
-
-  // operations
-  //def newerThan[N <: M](that: Statement[N]): Boolean = ???
 }
 
 object Statement {
-  sealed trait NominationStatement extends Statement[Message.Nomination]
+  sealed trait NominationStatement                          extends Statement[Message.Nomination]
   sealed trait BallotStatement[+M <: Message.BallotMessage] extends Statement[M]
 
   case class Nominate(
@@ -48,5 +45,14 @@ object Statement {
              Message.nominationBuilder().build())
 
   def newerThan[M <: Message](old: Statement[M], n: Statement[M]): Boolean = ???
+
+  def initialPrepare(nodeID: NodeID, slotIndex: SlotIndex, quorumSet: QuorumSet): Prepare =
+    Prepare(nodeID, slotIndex, quorumSet.hash, Message.nullPrepare)
+
+  def initialCommit(nodeID: NodeID, slotIndex: SlotIndex, quorumSet: QuorumSet): Commit =
+    Commit(nodeID, slotIndex, quorumSet.hash, Message.nullCommit)
+
+  def initialExternalize(nodeID: NodeID, slotIndex: SlotIndex, quorumSet: QuorumSet): Externalize =
+    Externalize(nodeID, slotIndex, quorumSet.hash, Message.nullExternalize)
 
 }
