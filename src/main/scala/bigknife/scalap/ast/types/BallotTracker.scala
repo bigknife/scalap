@@ -40,6 +40,21 @@ case class BallotTracker(
 }
 
 object BallotTracker {
+  def newTracker(nodeID: NodeID, slotIndex: SlotIndex): BallotTracker = BallotTracker(
+    nodeID,
+    slotIndex,
+    Phase.Prepare,
+    Ballot.Null,
+    Ballot.Null,
+    Ballot.Null,
+    Ballot.Null,
+    Ballot.Null,
+    Map.empty,
+    None,
+    None,
+    heardFromQuorum = false
+  )
+
   sealed trait Phase extends Ordered[Phase] {
     def is(name: String): Boolean
 

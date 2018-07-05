@@ -8,7 +8,7 @@ import bigknife.sop._
 import bigknife.sop.implicits._
 
 trait EnvelopeProcessHelper[F[_]] extends BallotBaseHelper[F] {
-  self: ModelSupport[F] with ConvenienceSupport[F] with BallotCore[F] =>
+  self: ModelSupport[F] with ConvenienceSupport[F] with BallotCore[F] with BumpingHelper[F] =>
   import model._
 
   /**
@@ -362,17 +362,24 @@ trait EnvelopeProcessHelper[F[_]] extends BallotBaseHelper[F] {
     }
   }
 
-  private def setCommitConfirm(tracker: BallotTracker, quorumSet: QuorumSet, candidate: Interval, ballot: Ballot): SP[F, Delta[BallotTracker]] = {
-    ifM[Delta[BallotTracker]](tracker.unchanged, _ => candidate.first > 0) {_ =>
-      val c = Ballot(candidate.first, ballot.value)
-      val h = Ballot(candidate.second, ballot.value)
+  private def setCommitConfirm(tracker: BallotTracker,
+                               quorumSet: QuorumSet,
+                               candidate: Interval,
+                               ballot: Ballot): SP[F, Delta[BallotTracker]] = {
+    ifM[Delta[BallotTracker]](tracker.unchanged, _ => candidate.first > 0) { _ =>
+      val c              = Ballot(candidate.first, ballot.value)
+      val h              = Ballot(candidate.second, ballot.value)
       val trackerUpdated = tracker.copy(commit = c, high = h)
       for {
         trackerD0 <- updateCurrentIfNeeded(trackerUpdated)
-        trackerD1 <- emitCurrentStateStatement(trackerD0.data.copy(phase = Phase.Externalize), quorumSet)
+        trackerD1 <- emitCurrentStateStatement(trackerD0.data.copy(phase = Phase.Externalize),
+                                               quorumSet)
         nominateTracker <- nodeStore.getNominateTracker(tracker.nodeID, tracker.slotIndex)
-        _ <- nominateService.stopNomination(nominateTracker)
-        _ <- nodeStore.saveNominateTracker(tracker.nodeID, nominateTracker)
+        _               <- nominateService.stopNomination(nominateTracker)
+        _               <- nodeStore.saveNominateTracker(tracker.nodeID, nominateTracker)
+        _ <- ballotService.externalizedValue(trackerD1.data.nodeID,
+                                             trackerD1.data.slotIndex,
+                                             trackerD1.data.commit.value)
       } yield trackerD1
     }
   }
@@ -469,9 +476,54 @@ trait EnvelopeProcessHelper[F[_]] extends BallotBaseHelper[F] {
         shouldBeCommit && highAndCommitShouldNotBeNull &&
           ballotShouldNotBeNull && ballotCompatibleCommit && boundaries.nonEmpty) { _ =>
       for {
-        interval <- findExtendedInterval(tracker, quorumSet, boundaries, pred)
+        interval  <- findExtendedInterval(tracker, quorumSet, boundaries, pred)
         trackerD0 <- setCommitConfirm(tracker, quorumSet, interval, ballot)
       } yield trackerD0
+    }
+  }
+
+  private def attempBump(tracker: BallotTracker, quorumSet: QuorumSet): SP[F, Unit] = {
+    if (tracker.isExternalizePhase) ().pureSP[F]
+    else {
+      def isVBlocking(counter: Int): Boolean = {
+        val nodeIDs = tracker.latestBallotEnvelope
+          .filter {
+            case (nodeID, ballotEvelope) =>
+              ballotEvelope.statement.message match {
+                case x: Message.Prepare     => counter < x.ballot.counter
+                case x: Message.Commit      => counter < x.ballot.counter
+                case x: Message.Externalize => counter < Int.MaxValue
+              }
+          }
+          .keys
+          .toSet
+        quorumSet.isQuorumSlice(nodeIDs)
+      }
+
+      // find all counters to a set
+      val targetCounter = tracker.current.counter
+
+      lazy val allCounters = tracker.latestBallotEnvelope
+        .foldLeft(Set.empty[Int]) { (acc, n) =>
+          n._2.statement.message match {
+            case x: Message.Prepare     => acc + x.prepared.counter
+            case x: Message.Commit      => acc + x.ballot.counter
+            case x: Message.Externalize => acc + Int.MaxValue
+          }
+        }
+        .toVector
+        .filter(_ > targetCounter)
+        .sorted
+
+      if (isVBlocking(targetCounter)) {
+        val smallestNotVBlocking = allCounters.find(x => !isVBlocking(x))
+        if (smallestNotVBlocking.isDefined)
+          for {
+            _ <- nodeStore.saveBallotTracker(tracker.nodeID, tracker)
+            _ <- abandonBallot(tracker.nodeID, tracker.slotIndex, smallestNotVBlocking.get)
+          } yield ()
+        else ().pureSP[F]
+      } else ().pureSP[F]
     }
   }
 
@@ -487,11 +539,13 @@ trait EnvelopeProcessHelper[F[_]] extends BallotBaseHelper[F] {
     //todo: attempt to bump state
     //todo: send latest envelope(if not sent)
     for {
-      pa <- attemptPreparedAccept(tracker, quorumSet, statement)
-      pc <- attemptPreparedConfirm(pa.data, quorumSet, statement)
-      ca <- attemptCommitAccept(pc.data, quorumSet, statement)
-      cc <- attemptCommitConfirm(ca.data, quorumSet, statement)
-    } yield cc.data
+      pa           <- attemptPreparedAccept(tracker, quorumSet, statement)
+      pc           <- attemptPreparedConfirm(pa.data, quorumSet, statement)
+      ca           <- attemptCommitAccept(pc.data, quorumSet, statement)
+      cc           <- attemptCommitConfirm(ca.data, quorumSet, statement)
+      _            <- attempBump(tracker, quorumSet)
+      trackerFinal <- checkHeardFromQuorum(tracker)
+    } yield trackerFinal.data
   }
 
   def recordEnvelope[M <: BallotMessage](tracker: BallotTracker,

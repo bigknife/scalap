@@ -1,9 +1,12 @@
 package bigknife.scalap
 package interpreter
 
+import bigknife.scalap.ast.types.{NodeID, QuorumSet}
 import bigknife.scalap.world.Connect
 
 case class Setting(
+    localNodeID: NodeID,
+    quorumSet: QuorumSet,
     connect: world.Connect,
     maxTimeoutSeconds: Int
 )
@@ -11,6 +14,6 @@ case class Setting(
 object Setting {
   def default(): Setting = {
     val connect = Connect.dummy
-    Setting(connect, maxTimeoutSeconds = 30 * 60)
+    Setting(NodeID.empty, QuorumSet.fake, connect, maxTimeoutSeconds = 30 * 60)
   }
 }

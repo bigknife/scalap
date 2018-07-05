@@ -55,6 +55,8 @@ trait Connect {
     * @param counter ballot's counter
     */
   def runAbandonBallot(nodeID: NodeID, slotIndex: SlotIndex, counter: Int): Unit
+
+  def valueExternalized(nodeID: NodeID, slotIndex: SlotIndex, value: Value): Unit
 }
 
 object Connect {
@@ -114,5 +116,7 @@ object Connect {
       * @param counter ballot's counter
       */
     override def runAbandonBallot(nodeID: NodeID, slotIndex: SlotIndex, counter: Int): Unit = ()
+
+    override def valueExternalized(nodeID: NodeID, slotIndex: SlotIndex, value: Value): Unit = ()
   }
 }

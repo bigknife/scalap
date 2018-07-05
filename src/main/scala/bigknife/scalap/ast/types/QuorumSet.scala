@@ -62,8 +62,12 @@ object QuorumSet {
     override def size: Int = validators.size + innerSets.size
   }
 
+  def fake: QuorumSet = Simple(0, Set.empty)
+
   def simple(threshold: Int, nodeIds: NodeID*): QuorumSet =
     Simple(threshold, nodeIds.toSet)
+
+  def singleton(nodeID: NodeID): QuorumSet = simple(1, nodeID)
 
   def nest(quorumSet: QuorumSet, threshold: Int, nodeIds: NodeID*): QuorumSet = quorumSet match {
     case Simple(_threshold, validators) =>

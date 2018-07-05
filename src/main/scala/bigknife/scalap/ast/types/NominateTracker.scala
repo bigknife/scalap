@@ -18,3 +18,17 @@ case class NominateTracker(
   def sentEnvelope(envelope: Envelope[Message.Nomination]): NominateTracker =
     copy(lastSentEnvelope = Some(envelope))
 }
+
+object NominateTracker {
+  def newTracker(nodeID: NodeID, slotIndex: SlotIndex): NominateTracker =
+    NominateTracker(nodeID,
+                    slotIndex,
+                    nominationStarted = false,
+                    0,
+                    Set.empty[NodeID],
+                    Value.bottom,
+                    Message.nominationBuilder().build(),
+                    ValueSet.empty,
+                    Map.empty,
+                    None)
+}

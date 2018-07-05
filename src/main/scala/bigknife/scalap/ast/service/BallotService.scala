@@ -91,4 +91,12 @@ import bigknife.sop.implicits._
   def broadcastEnvelope(tracker: BallotTracker,
                         quorumSet: QuorumSet,
                         envelope: BallotEnvelope[BallotMessage]): P[F, Delta[BallotTracker]]
+
+  /**
+    * when agreement reached, an event triggered
+    * @param slotIndex slot index
+    * @param value value
+    * @return
+    */
+  def externalizedValue(nodeID: NodeID, slotIndex: SlotIndex, value: Value): P[F, Unit]
 }

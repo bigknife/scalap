@@ -182,6 +182,10 @@ private[service] class BallotServiceHandler extends BallotService.Handler[Stack]
       } else Delta.changed(t1)
     }
   }
+
+  override def externalizedValue(nodeID: NodeID, slotIndex: SlotIndex, value: Value): Stack[Unit] = Stack {setting =>
+    setting.connect.valueExternalized(nodeID, slotIndex, value)
+  }
 }
 
 object BallotServiceHandler {
