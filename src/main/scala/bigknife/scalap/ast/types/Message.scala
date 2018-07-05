@@ -3,7 +3,18 @@ package bigknife.scalap.ast.types
 sealed trait Message {}
 
 object Message {
-  sealed trait BallotMessage extends Message
+  sealed trait BallotMessage extends Message {
+    def order: Int
+
+    def isPrepare: Boolean
+    def noPrepare: Boolean = !isPrepare
+
+    def isCommit: Boolean
+    def notCommit: Boolean = !isCommit
+
+    def isExternalize: Boolean
+    def noExternalize: Boolean = !isExternalize
+  }
 
   case class Nomination(
       voted: ValueSet,
@@ -19,7 +30,15 @@ object Message {
       preparedPrime: Ballot,
       hCounter: Int,
       cCounter: Int
-  ) extends BallotMessage
+  ) extends BallotMessage {
+    override def order: Int = 1
+
+    override def isPrepare: Boolean = true
+
+    override def isCommit: Boolean = false
+
+    override def isExternalize: Boolean = false
+  }
 
   /** also: Commit */
   case class Commit(
@@ -27,12 +46,26 @@ object Message {
       preparedCounter: Int,
       hCounter: Int,
       cCounter: Int
-  ) extends BallotMessage
+  ) extends BallotMessage {
+    override def order: Int = 2
+
+    override def isPrepare: Boolean     = false
+    override def isCommit: Boolean      = true
+    override def isExternalize: Boolean = false
+  }
 
   case class Externalize(
       commit: Ballot,
       hCounter: Int
-  ) extends BallotMessage
+  ) extends BallotMessage {
+    override def order: Int = 3
+
+    override def isPrepare: Boolean = false
+
+    override def isCommit: Boolean = false
+
+    override def isExternalize: Boolean = true
+  }
 
   class NominationBuilder {
     private val voted: collection.mutable.ListBuffer[Value]    = collection.mutable.ListBuffer.empty

@@ -24,6 +24,7 @@ sealed trait LinkedHashSet[A] {
   def isEmpty: Boolean
 
   def hasGrownFrom(that: LinkedHashSet[A]): Boolean = LinkedHashSet.hasGrown(that, this)
+  def hasGrownEqualFrom(that: LinkedHashSet[A]): Boolean = LinkedHashSet.hasGrownEqual(that, this)
 
   def unsafeHeadValue(): A
 
@@ -69,6 +70,11 @@ object LinkedHashSet {
   def hasGrown[A](x1: LinkedHashSet[A], x2: LinkedHashSet[A]): Boolean = (x1, x2) match {
     case (SimpleLHS(d1, _), SimpleLHS(d2, _)) =>
       d2.length > d1.length && d2.containsSlice(d1)
+  }
+
+  def hasGrownEqual[A](x1: LinkedHashSet[A], x2: LinkedHashSet[A]): Boolean = (x1, x2) match {
+    case (SimpleLHS(d1, _), SimpleLHS(d2, _)) =>
+      d2.length >= d1.length && d2.containsSlice(d1)
   }
 
   def toString[A](lhs: LinkedHashSet[A]): String = lhs match {

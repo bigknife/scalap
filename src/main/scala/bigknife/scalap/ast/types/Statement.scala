@@ -11,7 +11,8 @@ sealed trait Statement[+M <: Message] {
 
 object Statement {
   sealed trait NominationStatement                          extends Statement[Message.Nomination]
-  sealed trait BallotStatement[+M <: Message.BallotMessage] extends Statement[M]
+  sealed trait BallotStatement[+M <: Message.BallotMessage] extends Statement[M] {
+  }
 
   case class Nominate(
       nodeID: NodeID,
@@ -26,11 +27,13 @@ object Statement {
                      message: Message.Prepare)
       extends BallotStatement[Message.Prepare]
 
+
   case class Commit(nodeID: NodeID,
                     slotIndex: SlotIndex,
                     quorumSetHash: Hash,
                     message: Message.Commit)
       extends BallotStatement[Message.Commit]
+
 
   case class Externalize(nodeID: NodeID,
                          slotIndex: SlotIndex,
@@ -38,13 +41,38 @@ object Statement {
                          message: Message.Externalize)
       extends BallotStatement[Message.Externalize]
 
+
   def fakeNominate: Nominate =
     Nominate(NodeID(Array.emptyByteArray),
              SlotIndex(-1),
              Hash(Array.emptyByteArray),
              Message.nominationBuilder().build())
 
-  def newerThan[M <: Message](old: Statement[M], n: Statement[M]): Boolean = ???
+  def newerThan[M <: Message](old: Statement[M], n: Statement[M]): Boolean = {
+    (old.message, n.message) match {
+      case x@(Message.Nomination(oldVoted, oldAccepted), Message.Nomination(voted, accepted)) =>
+        if (voted.hasGrownEqualFrom(oldVoted) && accepted.hasGrownEqualFrom(oldAccepted)) {
+          voted.hasGrownFrom(oldVoted) || accepted.hasGrownFrom(oldAccepted)
+        } else false
+      case (m1, m2)  => m1 match {
+        case x1: Message.BallotMessage => m2 match {
+          case x2: Message.BallotMessage =>
+            if (x1.order != x2.order) x2.order > x1.order
+            else {
+              // can't have duplicate Externalized msg
+              if (x2.isExternalize) false
+              else {
+                if (x2.isCommit) {
+                  
+                }
+              }
+            }
+          case _ => false
+        }
+        case _ => false
+      }
+    }
+  }
 
   def initialPrepare(nodeID: NodeID, slotIndex: SlotIndex, quorumSet: QuorumSet): Prepare =
     Prepare(nodeID, slotIndex, quorumSet.hash, Message.nullPrepare)
