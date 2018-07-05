@@ -260,7 +260,7 @@ trait EnvelopeProcessHelper[F[_]] extends BallotBaseHelper[F] {
         trackerD1 <- ifM[Delta[BallotTracker]](trackerD0, _.changed) { _ =>
           for {
             trackerD10 <- updateCurrentIfNeeded(trackerD0.data)
-            trackerD11 <- emitCurrentStateStatement(tracker, quorumSet)
+            trackerD11 <- emitCurrentStateStatement(trackerD10.data, quorumSet)
           } yield trackerD11
         }
 
@@ -287,7 +287,7 @@ trait EnvelopeProcessHelper[F[_]] extends BallotBaseHelper[F] {
   private def getCommitBoundariesFromStatements(tracker: BallotTracker,
                                                 ballot: Ballot): Set[Int] = {
     tracker.latestBallotEnvelope.foldLeft(Set.empty[Int]) {
-      case (acc, (nodeId, envelope)) =>
+      case (acc, (_, envelope)) =>
         envelope.statement.message match {
           case x: Message.Prepare =>
             if (ballot.compatible(x.ballot) && x.cCounter > 0) acc + x.cCounter + x.hCounter
@@ -320,7 +320,7 @@ trait EnvelopeProcessHelper[F[_]] extends BallotBaseHelper[F] {
               b <- predicate(cur)
             } yield if (b) (cur, NO_BREAK) else (pre._1, BREAK)
           }
-        } yield pre
+        } yield x
       }
       .map(_._1)
   }
@@ -403,7 +403,7 @@ trait EnvelopeProcessHelper[F[_]] extends BallotBaseHelper[F] {
       }
       val acceptedPredict: Predicate[Statement[BallotMessage]] = { x =>
         x.message match {
-          case y: Message.Prepare => false
+          case _: Message.Prepare => false
           case y: Message.Commit =>
             ballot.compatible(y.ballot) &&
               (y.cCounter <= interval.first && interval.second <= y.hCounter)
