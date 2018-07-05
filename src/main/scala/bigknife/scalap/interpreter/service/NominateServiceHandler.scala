@@ -13,10 +13,11 @@ import org.slf4j.LoggerFactory
 class NominateServiceHandler extends NominateService.Handler[Stack] {
   private val log = LoggerFactory.getLogger(getClass)
 
-  override def findRoundLeaders(quorumSet: QuorumSet,
+  override def findRoundLeaders(tracker: NominateTracker,
+                                 quorumSet: QuorumSet,
                                 round: Int,
                                 slotIndex: SlotIndex,
-                                previousValue: Value): Stack[Set[NodeID]] =
+                                previousValue: Value): Stack[NominateTracker] =
     Stack {
       val neighbors: Set[NodeID] =
         quorumSet.neighbors(round, slotIndex, previousValue)
@@ -32,22 +33,27 @@ class NominateServiceHandler extends NominateService.Handler[Stack] {
       }
 
       log.debug("findRoundLeaders found the top priority in round {} is {}", round, res._2)
-      res._1
+      tracker.copy(roundLeaders = res._1)
     }
 
   override def nominateNewValuesWithLeaders(tracker: NominateTracker,
-                                 nodeID: NodeID,
-                                 tryToNominate: Value,
-                                 leaders: Set[NodeID]): Stack[NominateNewValuesResult] = Stack {
-    setting =>
+                                            nodeID: NodeID,
+                                            tryToNominate: Value): Stack[NominateNewValuesResult] =
+    Stack { setting =>
+      val leaders = tracker.roundLeaders
       if (leaders.contains(nodeID)) {
-        BoolResult(tracker.copy(
-                     nomination = Message
-                       .nominationBuilder()
-                       .fromNomination(tracker.nomination)
-                       .vote(tryToNominate)
-                       .build()),
-                   successful = true)
+        val t = tracker.copy(
+          nominationStarted = true,
+          round = tracker.round + 1,
+          nomination = Message
+            .nominationBuilder()
+            .fromNomination(tracker.nomination)
+            .vote(tryToNominate)
+            .build()
+        )
+        log.debug(
+          s"current node($nodeID) is a leader, vote the value, then tracker turns into $tracker")
+        BoolResult(t, successful = true)
       } else {
         val nominations: Vector[Nomination] =
           tracker.latestNominations
@@ -81,18 +87,21 @@ class NominateServiceHandler extends NominateService.Handler[Stack] {
         if (nominatingValue.isDefined) {
           BoolResult(
             tracker.copy(
+              round = tracker.round + 1,
+              nominationStarted = true,
               nomination = Message
                 .nominationBuilder()
                 .fromNomination(tracker.nomination)
                 .vote(nominatingValue.get)
-                .build(),
-              roundLeaders = leaders
+                .build()
             ),
             successful = true
           )
-        } else BoolResult(tracker.copy(roundLeaders = leaders), successful = false)
+        } else
+          BoolResult(tracker.copy(round = tracker.round + 1, nominationStarted = true),
+                     successful = false)
       }
-  }
+    }
 
   override def getNewValueFromNomination(tracker: NominateTracker,
                                          nom: Nomination): Stack[Option[Value]] = Stack { setting =>
@@ -152,7 +161,7 @@ class NominateServiceHandler extends NominateService.Handler[Stack] {
       latestNominations = tracker.latestNominations + (envelope.statement.nodeID -> envelope))
   }
 
-  override def combineValues(valueSet: ValueSet): Stack[Value] = Stack {setting =>
+  override def combineValues(valueSet: ValueSet): Stack[Value] = Stack { setting =>
     setting.connect.combineValues(valueSet)
   }
 

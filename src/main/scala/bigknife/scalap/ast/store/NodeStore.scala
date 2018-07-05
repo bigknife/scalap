@@ -18,6 +18,8 @@ import bigknife.sop.macros._
     */
   def getQuorumSetFromStatement[M <: Message](statement: Statement[M]): P[F, QuorumSet]
 
+  def cacheQuorumSet(quorumSet: QuorumSet): P[F, Unit]
+
   def saveNominateTracker(nodeID: NodeID, nominateTracker: NominateTracker): P[F, Unit]
   def saveBallotTracker(nodeID: NodeID, ballotTracker: BallotTracker): P[F, Unit]
 

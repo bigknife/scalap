@@ -14,6 +14,7 @@ trait NominationCore[F[_]] {
     */
   def nominate(nodeID: NodeID,
                slotIndex: SlotIndex,
+               round: Int,
                valueToNominate: Value,
                previousValue: Value): SP[F, Boolean]
 

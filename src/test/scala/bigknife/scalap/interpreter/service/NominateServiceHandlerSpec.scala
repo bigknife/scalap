@@ -26,15 +26,17 @@ class NominateServiceHandlerSpec extends FunSuite with GivenWhenThen {
       .simple(3, nodeIds.take(4): _*)
       .nest(1, nodeIds(4), nodeIds(5))
 
+
     for (i <- 1 to 50) {
       Given(s"round = $i, slotIndex = 1, previousValue = Value(hello,world)")
       val round: Int = i
       val slotIndex: SlotIndex = SlotIndex(1)
       val previousValue: Value = Value.simple("hello,world".getBytes())
+      val tracker = NominateTracker.newTracker(nodeIds(0), slotIndex)
 
       When("find round leaders")
       val leaders = nominateServiceHandler
-        .findRoundLeaders(qSet, round, slotIndex, previousValue)(setting)
+        .findRoundLeaders(tracker, qSet, round, slotIndex, previousValue)(setting)
         .unsafeRunSync()
 
       Then("leaders found")

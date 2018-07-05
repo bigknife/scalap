@@ -8,14 +8,17 @@ object Message {
   case class Nomination(
       voted: ValueSet,
       accepted: ValueSet
-  ) extends Message
+  ) extends Message {
+    def isEmpty: Boolean  = voted.isEmpty && accepted.isEmpty
+    def notEmpty: Boolean = !isEmpty
+  }
 
   case class Prepare(
-                      ballot: Ballot,
-                      prepared: Ballot,
-                      preparedPrime: Ballot,
-                      hCounter: Int,
-                      cCounter: Int
+      ballot: Ballot,
+      prepared: Ballot,
+      preparedPrime: Ballot,
+      hCounter: Int,
+      cCounter: Int
   ) extends BallotMessage
 
   /** also: Commit */
@@ -38,7 +41,7 @@ object Message {
     def build(): Nomination = {
       // voted and accepted should be disjoint, if eligible to both, put it into accepted
       val votedList     = voted.toList
-      val filteredVoted = votedList.filter(accepted.contains)
+      val filteredVoted = votedList.filter(x => !accepted.contains(x))
       Nomination(ValueSet(filteredVoted: _*), ValueSet(accepted: _*))
     }
 
@@ -64,24 +67,32 @@ object Message {
 
   // null smart constructor
   def nullPrepare: Message.Prepare = Message.Prepare(
-    Ballot.Null, Ballot.Null, Ballot.Null, 0, 0
+    Ballot.Null,
+    Ballot.Null,
+    Ballot.Null,
+    0,
+    0
   )
-  def nullCommit: Message.Commit = Message.Commit(Ballot.Null, 0, 0, 0)
+  def nullCommit: Message.Commit           = Message.Commit(Ballot.Null, 0, 0, 0)
   def nullExternalize: Message.Externalize = Message.Externalize(Ballot.Null, 0)
 
   /////// message ops
   trait Ops {
     implicit final class MessageOps(message: Message) {
-      private def isAsc(values: ValueSet): Boolean =
-        values.sliding(2).exists {
-          case Seq()     => true
-          case Seq(_)    => true
-          case Seq(l, r) => l <= r
-        }
+      private def isAsc(values: ValueSet): Boolean = {
+        val s = values.sliding(2)
+        if (s.isEmpty) true
+        else
+          s.exists {
+            case Seq()     => true
+            case Seq(_)    => true
+            case Seq(l, r) => l <= r
+          }
+      }
       def isSane: Boolean = message match {
-        case Nomination(voted, accepted) =>
+        case x @ Nomination(voted, accepted) =>
           // values of voted and accepted should ordered ASC
-          !(voted.isEmpty && accepted.isEmpty) && isAsc(voted) && isAsc(accepted)
+          x.notEmpty && isAsc(voted) && isAsc(accepted)
 
         case Prepare(ballot, prepare, preparePrime, hCounter, cCounter) =>
           val cond1 = ballot.notNull

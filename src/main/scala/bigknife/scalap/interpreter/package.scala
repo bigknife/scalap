@@ -1,5 +1,7 @@
 package bigknife.scalap
 
+import bigknife.scalap.interpreter.service._
+import bigknife.scalap.interpreter.store.NodeStoreHandler
 import cats.data.Kleisli
 import cats.effect.IO
 
@@ -16,15 +18,12 @@ package object interpreter {
     }
   }
 
-  /*
   object handlers
-      extends MessageServiceHandler.Implicits
-      with SlotServiceHandler.Implicits
-      with SlotStoreHandler.Implicits
-      with QuorumSetServiceHandler.Implicits
-      with QuorumSetStoreHandler.Implicits
-      with LogServiceHandler.Implicits
+      extends LogServiceHandler.Implicits
       with NodeStoreHandler.Implicits
+      with NominateServiceHandler.Implicits
+      with BallotServiceHandler.Implicits
+      with EnvelopeServiceHandler.Implicits
 
   object runner {
     import bigknife.sop._
@@ -36,10 +35,9 @@ package object interpreter {
     def runStack[A](p: SP[Model.Op, A]): Stack[A] = p.interpret[Stack]
     def runIO[A](p: SP[Model.Op, A], setting: Setting): cats.effect.IO[A] =
       runStack(p)(setting)
-    def runIOAttempt[A](
-        p: SP[Model.Op, A],
-        setting: Setting): cats.effect.IO[Either[Throwable, A]] =
+    def runIOAttempt[A](p: SP[Model.Op, A],
+                        setting: Setting): cats.effect.IO[Either[Throwable, A]] =
       runStack(p)(setting).attempt
   }
-  */
+
 }

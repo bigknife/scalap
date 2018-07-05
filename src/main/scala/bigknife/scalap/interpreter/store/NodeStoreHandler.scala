@@ -11,7 +11,7 @@ class NodeStoreHandler extends NodeStore.Handler[Stack] {
 
   private val nominateTrackerStore: mutable.Map[TrackerKey, NominateTracker] = mutable.Map.empty
   private val ballotTrackerStore: mutable.Map[TrackerKey, BallotTracker]     = mutable.Map.empty
-  private val quorumSet: mutable.Map[NodeID, QuorumSet]                      = mutable.Map.empty
+
   private val historicalStatementStore: mutable.ListBuffer[HistoricalStatement] =
     mutable.ListBuffer.empty
   private val quorumSetStore: mutable.Map[Hash, QuorumSet] = mutable.Map.empty
@@ -40,8 +40,8 @@ class NodeStoreHandler extends NodeStore.Handler[Stack] {
       }
     }
 
-  override def getQuorumSet(nodeID: NodeID): Stack[QuorumSet] = Stack {
-    quorumSet.getOrElse(nodeID, QuorumSet.fake)
+  override def getQuorumSet(nodeID: NodeID): Stack[QuorumSet] = Stack { setting =>
+    if (setting.localNodeID == nodeID) setting.quorumSet else QuorumSet.fake
   }
 
   override def getQuorumSetFromStatement[M <: Message](statement: Statement[M]): Stack[QuorumSet] =
@@ -56,6 +56,12 @@ class NodeStoreHandler extends NodeStore.Handler[Stack] {
         }
       }
     }
+
+
+  override def cacheQuorumSet(quorumSet: QuorumSet): Stack[Unit] = Stack {
+    quorumSetStore.put(quorumSet.hash, quorumSet)
+    ()
+  }
 
   override def saveNominateTracker(nodeID: NodeID, nominateTracker: NominateTracker): Stack[Unit] =
     Stack {

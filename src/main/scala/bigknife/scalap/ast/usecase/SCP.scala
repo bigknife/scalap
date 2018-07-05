@@ -5,7 +5,7 @@ import bigknife.scalap.ast.usecase.component.Model
 import bigknife.scalap.ast.usecase.nominate.{EnvelopeProcessHelper => NEPH, NominateHelper}
 
 
-trait SCP[F[_]] extends NominationProtocol[F] with BallotProtocol[F] {
+trait SCP[F[_]] extends NominationProtocol[F] with BallotProtocol[F] with MiscProtocol[F] {
   self: NominateHelper[F]
     with NEPH[F]
     with BumpingHelper[F]

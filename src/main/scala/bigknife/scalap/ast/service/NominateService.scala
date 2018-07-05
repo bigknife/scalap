@@ -16,23 +16,22 @@ import bigknife.sop.implicits._
     * @param previousValue the value of last slot (slotIndex - 1)
     * @return leaders node id.
     */
-  def findRoundLeaders(quorumSet: QuorumSet,
+  def findRoundLeaders(tracker: NominateTracker,
+                       quorumSet: QuorumSet,
                        round: Int,
                        slotIndex: SlotIndex,
-                       previousValue: Value): P[F, Set[NodeID]]
+                       previousValue: Value): P[F, NominateTracker]
 
   /**
     * try to nominate new values
     * @param tracker current tracker
     * @param nodeID the node which try to nominate the new value
     * @param tryToNominate value to try to nominate
-    * @param leaders the nodeId's quorumset's leaders on current round(tracker.round)
     * @return result, if the tracker updated return (new tracker, true) else (old tracker, false)
     */
   def nominateNewValuesWithLeaders(tracker: NominateTracker,
                                    nodeID: NodeID,
-                                   tryToNominate: Value,
-                                   leaders: Set[NodeID]): P[F, NominateNewValuesResult]
+                                   tryToNominate: Value): P[F, NominateNewValuesResult]
 
   /**
     * resolve value from nomination message

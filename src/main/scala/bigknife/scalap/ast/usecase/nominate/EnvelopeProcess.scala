@@ -27,9 +27,13 @@ trait EnvelopeProcess[F[_]] extends NominationCore[F] {
     for {
       tracker  <- nodeStore.getNominateTracker(nodeID, slotIndex)
       verified <- self.verifySignature(envelope)
-      state <- ifM[Envelope.State](
-        Envelope.State.invalid,
-        _ => verified && message.isSane && self.isNewerStatement(statement, tracker)) { _ =>
+      _ <- logService.debug(s"nomination envelope signature verified ? $verified",
+                            Some("nom-msg-proc"))
+      sane  <- message.isSane.pureSP[F]
+      _     <- logService.debug(s"nomination message sane ? $sane", Some("nom-msg-proc"))
+      newer <- self.isNewerStatement(statement, tracker).pureSP[F]
+      _     <- logService.debug(s"nomination statement newer ? $newer", Some("nom-msg-proc"))
+      state <- ifM[Envelope.State](Envelope.State.invalid, _ => verified && sane && newer) { _ =>
         for {
           qSet                   <- nodeStore.getQuorumSet(nodeID)
           trackerWithNewEnvelope <- self.saveNominationEnvelope(tracker, envelope)

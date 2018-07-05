@@ -13,11 +13,11 @@
         </encoder>
     </appender>
 
-    <logger name="scalap.ast" additivity="false" level="info">
+    <logger name="scalap.ast" additivity="false" level="debug">
         <appender-ref ref="AST" />
     </logger>
 
-    <logger name="bigknife.scalap" additivity="false" level="info">
+    <logger name="bigknife.scalap" additivity="false" level="debug">
         <appender-ref ref="AST" />
     </logger>
 
