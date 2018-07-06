@@ -136,7 +136,7 @@ object Message {
             prepare <= ballot
           } else true
           val cond3 = if (preparePrime.notNull) {
-            prepare.notNull && preparePrime < prepare && (cCounter <= hCounter && hCounter <= ballot.counter)
+            prepare.notNull && preparePrime <= prepare && (cCounter <= hCounter && hCounter <= ballot.counter)
           } else true
           cond1 && cond2 && cond3
 

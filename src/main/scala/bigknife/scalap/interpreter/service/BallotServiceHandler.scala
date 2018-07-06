@@ -170,8 +170,8 @@ private[service] class BallotServiceHandler extends BallotService.Handler[Stack]
       tracker: BallotTracker,
       quorumSet: QuorumSet,
       envelope: BallotEnvelope[BallotMessage]): Stack[Delta[BallotTracker]] = Stack { setting =>
-    if (tracker.current.isNull || tracker.lastGenEnvelope.isEmpty ||
-        tracker.lastGenEnvelope.exists(x => !Statement.newerThan(x.statement, envelope.statement)))
+    if (tracker.current.isNull && (tracker.lastGenEnvelope.isEmpty || tracker.lastGenEnvelope
+          .exists(x => !Statement.newerThan(x.statement, envelope.statement))))
       Delta.unchanged(tracker)
     else {
       val t1 = tracker.copy(lastGenEnvelope = Option(envelope))
@@ -183,9 +183,10 @@ private[service] class BallotServiceHandler extends BallotService.Handler[Stack]
     }
   }
 
-  override def externalizedValue(nodeID: NodeID, slotIndex: SlotIndex, value: Value): Stack[Unit] = Stack {setting =>
-    setting.connect.valueExternalized(nodeID, slotIndex, value)
-  }
+  override def externalizedValue(nodeID: NodeID, slotIndex: SlotIndex, value: Value): Stack[Unit] =
+    Stack { setting =>
+      setting.connect.valueExternalized(nodeID, slotIndex, value)
+    }
 }
 
 object BallotServiceHandler {

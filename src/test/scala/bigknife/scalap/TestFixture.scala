@@ -17,7 +17,10 @@ trait TestFixture {
 
   def createNodeId(seed: String): NodeID = NodeID(sha3(seed))
 
-  def newSetting(nodeID: NodeID, quorumSet: QuorumSet, presetQuorumSets: Map[NodeID, QuorumSet], connect: Connect): Setting = Setting(
+  def newSetting(nodeID: NodeID,
+                 quorumSet: QuorumSet,
+                 presetQuorumSets: Map[NodeID, QuorumSet],
+                 connect: Connect): Setting = Setting(
     localNodeID = nodeID,
     quorumSet = quorumSet,
     maxTimeoutSeconds = 30 * 60,
@@ -39,8 +42,22 @@ trait TestFixture {
       vote.foreach(nb.vote(_))
       accept.foreach(nb.accept(_))
 
-      val nom = Statement.Nominate(getNode(ownerIdx), slotIndex, getQuorumSet(ownerIdx).hash, nb.build())
+      val nom =
+        Statement.Nominate(getNode(ownerIdx), slotIndex, getQuorumSet(ownerIdx).hash, nb.build())
       Envelope.NominationEnvelope(nom, Signature.empty)
+    }
+
+    def createBallotPrepareEnvelope(
+        ownerIdx: Int,
+        slotIndex: SlotIndex,
+        ballot: Ballot,
+        prepared: Ballot = Ballot.Null,
+        preparedPrime: Ballot = Ballot.Null,
+        hCounter: Int = 0,
+        cCounter: Int = 0): Envelope.BallotEnvelope[Message.Prepare] = {
+      val p  = Message.Prepare(ballot, prepared, preparedPrime, hCounter, cCounter)
+      val st = Statement.Prepare(getNode(ownerIdx), slotIndex, getQuorumSet(ownerIdx).hash, p)
+      Envelope.BallotEnvelope(st, Signature.empty)
     }
 
   }

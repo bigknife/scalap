@@ -109,8 +109,9 @@ trait EnvelopeProcessHelper[F[_]] extends BallotBaseHelper[F] {
     //if not in prepare or confirm phase, ignore it.
     if (tracker.isExternalizePhase) Delta.unchanged(tracker).pureSP[F]
     else {
+      val allCandidates = getPreparedCandidateBallots(tracker, hint)
       // we should do some filtering work. to reduce the ballots that can't help local to advance.
-      val candidates: Vector[Ballot] = getPreparedCandidateBallots(tracker, hint).toVector.filter {
+      val candidates: Vector[Ballot] = allCandidates.toVector.filter {
         b =>
           val cond1 = tracker.isCommitPhase && !tracker.prepared.lessAndCompatible(b)
           val cond2 = tracker.preparedPrimeBallotNotNull && (b <= tracker.preparedPrime)
