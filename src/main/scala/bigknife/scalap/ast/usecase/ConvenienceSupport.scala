@@ -22,6 +22,7 @@ trait ConvenienceSupport[F[_]] {
         for {
           pre <- acc
           qs  <- nodeStore.getQuorumSetFromStatement(known(n).statement): SP[F, QuorumSet]
+          _ <- ifM[Unit]((), _ => qs.threshold == 0) {_ => logService.warn(s"found fake quorumset for $n")}
         } yield if (qs.isQuorumSlice(nodes)) (pre._1 + n, pre._2 - n) else pre
       }
       .map(_._1)

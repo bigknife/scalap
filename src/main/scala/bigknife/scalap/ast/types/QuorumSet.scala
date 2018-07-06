@@ -165,17 +165,20 @@ object QuorumSet {
     }
   }
 
-  def isQuorumSlice(quorumSet: QuorumSet, nodeIDs: Set[NodeID]): Boolean = quorumSet match {
-    case Simple(threshold, validators) =>
-      validators.count(nodeIDs.contains) >= threshold
-    case Nest(threshold, validators, innerSets) =>
-      val rest = threshold - validators.count(nodeIDs.contains)
-      if (rest <= 0) true
-      else {
-        val c = innerSets.foldLeft(0) {(acc, n) =>
-          if (isQuorumSlice(n, nodeIDs)) acc + 1 else acc
-        }
-        rest - c <= 0
+  def isQuorumSlice(quorumSet: QuorumSet, nodeIDs: Set[NodeID]): Boolean =
+    if (quorumSet.threshold == 0) false
+    else
+      quorumSet match {
+        case Simple(threshold, validators) =>
+          validators.count(nodeIDs.contains) >= threshold
+        case Nest(threshold, validators, innerSets) =>
+          val rest = threshold - validators.count(nodeIDs.contains)
+          if (rest <= 0) true
+          else {
+            val c = innerSets.foldLeft(0) { (acc, n) =>
+              if (isQuorumSlice(n, nodeIDs)) acc + 1 else acc
+            }
+            rest - c <= 0
+          }
       }
-  }
 }

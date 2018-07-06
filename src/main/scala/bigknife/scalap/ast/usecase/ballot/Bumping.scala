@@ -27,8 +27,12 @@ trait Bumping[F[_]] extends BallotCore[F] {
       if (tracker.currentBallotIsNull) 1 else tracker.current.counter + 1
     for {
       tracker <- nodeStore.getBallotTracker(nodeID, slotIndex)
-      _ <- ifM[Unit]((), _ => !force && tracker.currentBallotNotNull) { _ =>
-        bumpState(nodeID, slotIndex, value, nextCounter(tracker))
+      _ <- ifM[Unit]((), _ => !force /*&& tracker.currentBallotNotNull*/) { _ =>
+        val counter = nextCounter(tracker)
+        for {
+          _ <- logService.debug(s"start to bump state with counter=$counter, value=$value for $nodeID $slotIndex", Some("ballot-bumping"))
+          _ <- bumpState(nodeID, slotIndex, value, counter)
+        } yield ()
       }
     } yield ()
   }
@@ -42,8 +46,8 @@ trait Bumping[F[_]] extends BallotCore[F] {
     // and, if in externalize phrase, can't bump
     for {
       tracker <- nodeStore.getBallotTracker(nodeID, slotIndex)
-      qSet <- nodeStore.getQuorumSet(nodeID)
-      _ <- ifM[Unit]((), _ => tracker.isExternalizePhase) { _ =>
+      qSet    <- nodeStore.getQuorumSet(nodeID)
+      _ <- ifM[Unit]((), _ => tracker.notExternalizePhase) { _ =>
         for {
           newB      <- ballotService.newBallot(tracker, value, counter)
           trackerD0 <- self.updateCurrentBallotForTracker(tracker, newB)

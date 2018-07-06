@@ -15,9 +15,14 @@ trait NominateBaseHelper[F[_]] {
       msgResult: NominationEnvelopeResult): SP[F, NominateTracker] = {
     if (msgResult.successful) {
       for {
+        _  <- nodeStore.saveNominateTracker(nodeID, tracker)
         st <- self.processNominationEnvelope(nodeID, msgResult.data)
+        _  <- logService.info(s"processed nomination message locally: $st", Some("nom-msg-proc"))
         ret <- if (st == Envelope.State.Valid) for {
+          _ <- logService.info(s"start to broadcast envelope: ${msgResult.data}",
+                               Some("nom-msg-proc"))
           nt <- nominateService.broadcastEnvelope(tracker, msgResult.data): SP[F, NominateTracker]
+          _  <- logService.info(s"broadcasted envelope: ${msgResult.data}", Some("nom-msg-proc"))
         } yield nt
         else tracker.pureSP[F]
       } yield ret

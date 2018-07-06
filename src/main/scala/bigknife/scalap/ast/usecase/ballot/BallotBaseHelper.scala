@@ -11,7 +11,7 @@ trait BallotBaseHelper[F[_]] {
   import model._
 
   protected def emitCurrentStateStatement(tracker: BallotTracker,
-                                quorumSet: QuorumSet): SP[F, Delta[BallotTracker]] = {
+                                          quorumSet: QuorumSet): SP[F, Delta[BallotTracker]] = {
     // create a message from tracker
     // check the generated msg has been processed
     // if hasn't been processed, process it locally
@@ -25,11 +25,16 @@ trait BallotBaseHelper[F[_]] {
     for {
       envelope <- ballotService.createBallotEnvelope(tracker, quorumSet)
       trackerD0 <- ifM[Delta[BallotTracker]](Delta.unchanged(tracker), _ => !hasProcessed(envelope)) {
-        _ =>
+        x =>
           for {
+            _                <- nodeStore.saveBallotTracker(tracker.nodeID, tracker)
             state            <- self.processBallotEnvelope(tracker.nodeID, envelope)
-            trackerProcessed <- nodeStore.getBallotTracker(tracker.nodeID, tracker.slotIndex)
-            trackerD1 <- ballotService.broadcastEnvelope(trackerProcessed, quorumSet, envelope)
+            trackerD1 <- ifM[Delta[BallotTracker]](x, _ => state == Envelope.State.Valid) {_ =>
+              for {
+                trackerProcessed <- nodeStore.getBallotTracker(tracker.nodeID, tracker.slotIndex)
+                trackerD10        <- ballotService.broadcastEnvelope(trackerProcessed, quorumSet, envelope)
+              } yield trackerD10
+            }
           } yield trackerD1
       }
     } yield trackerD0

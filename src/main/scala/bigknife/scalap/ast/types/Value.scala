@@ -12,6 +12,8 @@ object Value {
   private object BottomValue extends Value {
     override def compare(that: Value): Int = if (that == this) 0 else -1
     override def bytes: Array[Byte]        = Array.emptyByteArray
+
+    override def toString: String = "NullValue"
   }
 
   private case class SimpleValue(data: Array[Byte]) extends Value {

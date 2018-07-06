@@ -22,7 +22,7 @@ trait EnvelopeProcessHelper[F[_]] extends NominateBaseHelper[F] {
   def isNewerStatement(statement: Statement[Message.Nomination],
                        tracker: NominateTracker): Boolean = {
     !tracker.latestNominations.contains(statement.nodeID) ||
-    Statement.newerThan(statement, tracker.latestNominations(statement.nodeID).statement)
+    Statement.newerThan(tracker.latestNominations(statement.nodeID).statement, statement)
 
     /*
     statement.newerThan(
@@ -54,8 +54,8 @@ trait EnvelopeProcessHelper[F[_]] extends NominateBaseHelper[F] {
     */
   protected def reduceNomination(tracker: NominateTracker,
                                  nomination: Message.Nomination): SP[F, Message.Nomination] = {
-    val voted    = nomination.voted.filter(tracker.nomination.accepted.contain)
-    val accepted = nomination.accepted.filter(tracker.candidates.contain)
+    val voted    = nomination.voted.filter(x => !tracker.nomination.accepted.contain(x))
+    val accepted = nomination.accepted.filter(x => !tracker.candidates.contain(x))
     nomination
       .copy(
         voted = voted,
@@ -174,6 +174,7 @@ trait EnvelopeProcessHelper[F[_]] extends NominateBaseHelper[F] {
                                 tracker: NominateTracker): SP[F, NominateTracker] = {
     for {
       combinedCandidate <- nominateService.combineValues(tracker.candidates)
+      _ <- logService.debug(s"combined candidate value before bumpState: $combinedCandidate", Some("nom-msg-proc"))
       _                 <- bumpState(nodeID, slotIndex, combinedCandidate, force = false)
     } yield tracker
   }

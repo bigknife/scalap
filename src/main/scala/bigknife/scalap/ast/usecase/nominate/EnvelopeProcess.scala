@@ -19,17 +19,17 @@ trait EnvelopeProcess[F[_]] extends NominationCore[F] {
     */
   override def processNominationEnvelope(nodeID: NodeID,
                                          envelope: NominationEnvelope): SP[F, Envelope.State] = {
-    val nodeID    = envelope.statement.nodeID
-    val slotIndex = envelope.statement.slotIndex
-    val statement = envelope.statement
-    val message   = statement.message
+    val remoteNodeID = envelope.statement.nodeID
+    val slotIndex    = envelope.statement.slotIndex
+    val statement    = envelope.statement
+    val message      = statement.message
 
     for {
       tracker  <- nodeStore.getNominateTracker(nodeID, slotIndex)
       verified <- self.verifySignature(envelope)
       _ <- logService.debug(s"nomination envelope signature verified ? $verified",
                             Some("nom-msg-proc"))
-      sane  <- message.isSane.pureSP[F]
+      sane  <- message.isSane(nodeID == remoteNodeID).pureSP[F]
       _     <- logService.debug(s"nomination message sane ? $sane", Some("nom-msg-proc"))
       newer <- self.isNewerStatement(statement, tracker).pureSP[F]
       _     <- logService.debug(s"nomination statement newer ? $newer", Some("nom-msg-proc"))
@@ -38,26 +38,45 @@ trait EnvelopeProcess[F[_]] extends NominationCore[F] {
           qSet                   <- nodeStore.getQuorumSet(nodeID)
           trackerWithNewEnvelope <- self.saveNominationEnvelope(tracker, envelope)
           reduced                <- self.reduceNomination(trackerWithNewEnvelope, envelope.statement.message)
+          _                      <- logService.info(s"reduced nomination message: $reduced", Some("nom-msg-proc"))
           valid                  <- self.validateNomination(nodeID, slotIndex, reduced)
           promoteAccept          <- self.promoteVotesToAccepted(trackerWithNewEnvelope, qSet, valid.voted)
-          promoteCandidate       <- self.promoteAcceptedToCandidates(promoteAccept, qSet, valid.accepted)
+          _ <- logService.info(s"after promote to accept: ${promoteAccept.nomination}",
+                               Some("nom-msg-proc"))
+          promoteCandidate <- self.promoteAcceptedToCandidates(promoteAccept, qSet, valid.accepted)
+          _ <- logService.info(s"after promote to candidate: ${promoteAccept.nomination}",
+                               Some("nom-msg-proc"))
           takenRoundLeadersOnDemand <- self.takeRoundLeadersVotesOnDemand(promoteCandidate,
                                                                           envelope.statement)
+          _ <- logService.info(
+            s"after takenRoundLeadersOnDemand: ${takenRoundLeadersOnDemand.nomination}",
+            Some("nom-msg-proc"))
           promotedAccept    <- self.acceptedHasPromoted(tracker, takenRoundLeadersOnDemand)
+          _                 <- logService.info(s"has promoted accepted? $promotedAccept", Some("nom-msg-proc"))
           promotedCandidate <- self.candidatesHasPromoted(tracker, takenRoundLeadersOnDemand)
-          emitted <- ifM[NominateTracker](promoteCandidate, _ => promotedAccept) { _ =>
+          _                 <- logService.info(s"has promoted candidate? $promotedCandidate", Some("nom-msg-proc"))
+          emitted <- ifM[NominateTracker](takenRoundLeadersOnDemand, _ => promotedAccept) { _ =>
             for {
               env <- nominateService.createNominationEnvelope(nodeID,
                                                               slotIndex,
                                                               qSet,
                                                               promoteCandidate.nomination)
+              _ <- logService.info(s"try to emit nomination message: $env", Some("nom-msg-proc"))
               emit <- emitNominationMessage(nodeID,
                                             promoteCandidate,
                                             BoolResult(env, successful = true))
             } yield emit
           }
-          bumped <- ifM[NominateTracker](emitted, _ => promotedCandidate)(_ =>
-            bumpBallotState(nodeID, slotIndex, emitted))
+          bumped <- ifM[NominateTracker](emitted, _ => promotedCandidate) { _ =>
+            for {
+              _ <- logService.debug(
+                s"start to bump, nodeID=$nodeID, slotIndex=$slotIndex, emitted=$emitted", Some("nom-msg-proc"))
+              x <- bumpBallotState(nodeID, slotIndex, emitted)
+              _ <- logService.debug(
+                s"after bumping, nodeID=$nodeID, slotIndex=$slotIndex, emitted=$emitted", Some("nom-msg-proc"))
+            } yield x
+          }
+          _ <- logService.info(s"after bumped: ${bumped.nomination}", Some("nom-msg-proc"))
           _ <- nodeStore.saveNominateTracker(nodeID, bumped)
         } yield Envelope.State.valid
       }

@@ -41,12 +41,16 @@ class NodeStoreHandler extends NodeStore.Handler[Stack] {
     }
 
   override def getQuorumSet(nodeID: NodeID): Stack[QuorumSet] = Stack { setting =>
-    if (setting.localNodeID == nodeID) setting.quorumSet else QuorumSet.fake
+    if (setting.localNodeID == nodeID) setting.quorumSet
+    else if (setting.presetQuorumSets.contains(nodeID)) setting.presetQuorumSets(nodeID)
+    else QuorumSet.fake
   }
 
   override def getQuorumSetFromStatement[M <: Message](statement: Statement[M]): Stack[QuorumSet] =
-    Stack {setting =>
+    Stack { setting =>
       if (setting.localNodeID == statement.nodeID) setting.quorumSet
+      else if (setting.presetQuorumSets.contains(statement.nodeID))
+        setting.presetQuorumSets(statement.nodeID)
       else {
         statement.message match {
           case x: Message.Externalize => QuorumSet.singleton(statement.nodeID)
@@ -56,7 +60,6 @@ class NodeStoreHandler extends NodeStore.Handler[Stack] {
         }
       }
     }
-
 
   override def cacheQuorumSet(quorumSet: QuorumSet): Stack[Unit] = Stack {
     quorumSetStore.put(quorumSet.hash, quorumSet)

@@ -8,12 +8,13 @@ case class Setting(
     localNodeID: NodeID,
     quorumSet: QuorumSet,
     connect: world.Connect,
-    maxTimeoutSeconds: Int
+    maxTimeoutSeconds: Int,
+    presetQuorumSets: Map[NodeID, QuorumSet]
 )
 
 object Setting {
   def default(): Setting = {
     val connect = Connect.dummy
-    Setting(NodeID.empty, QuorumSet.fake, connect, maxTimeoutSeconds = 30 * 60)
+    Setting(NodeID.empty, QuorumSet.fake, connect, maxTimeoutSeconds = 30 * 60, Map.empty)
   }
 }

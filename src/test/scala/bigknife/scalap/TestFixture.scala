@@ -17,10 +17,40 @@ trait TestFixture {
 
   def createNodeId(seed: String): NodeID = NodeID(sha3(seed))
 
-  def newSetting(nodeID: NodeID, quorumSet: QuorumSet): Setting = Setting(
+  def newSetting(nodeID: NodeID, quorumSet: QuorumSet, presetQuorumSets: Map[NodeID, QuorumSet], connect: Connect): Setting = Setting(
     localNodeID = nodeID,
     quorumSet = quorumSet,
     maxTimeoutSeconds = 30 * 60,
-    connect = new TestConnect
+    connect = connect,
+    presetQuorumSets = presetQuorumSets
   )
+
+  case class SCPCluster(
+      nodeIDs: Vector[NodeID],
+      quorumSets: Map[NodeID, QuorumSet]
+  ) {
+    def getNode(idx: Int): NodeID         = nodeIDs(idx)
+    def getQuorumSet(idx: Int): QuorumSet = quorumSets(getNode(idx))
+    def createNominationEnvelope(ownerIdx: Int,
+                                 slotIndex: SlotIndex,
+                                 vote: Option[TestValue],
+                                 accept: Option[TestValue]): Envelope.NominationEnvelope = {
+      val nb = Message.nominationBuilder()
+      vote.foreach(nb.vote(_))
+      accept.foreach(nb.accept(_))
+
+      val nom = Statement.Nominate(getNode(ownerIdx), slotIndex, getQuorumSet(ownerIdx).hash, nb.build())
+      Envelope.NominationEnvelope(nom, Signature.empty)
+    }
+
+  }
+
+  lazy val simple4nodes: SCPCluster = {
+    val nodeIDs = (0 to 3).toVector.map(x => "v" + x).map(createNodeId)
+    val qs      = QuorumSet.simple(3, nodeIDs: _*)
+    val quorumSets = nodeIDs.foldLeft(Map.empty[NodeID, QuorumSet]) { (acc, n) =>
+      acc + (n -> qs)
+    }
+    SCPCluster(nodeIDs, quorumSets)
+  }
 }

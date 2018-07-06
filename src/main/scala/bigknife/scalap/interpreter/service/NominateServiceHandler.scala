@@ -149,7 +149,7 @@ class NominateServiceHandler extends NominateService.Handler[Stack] {
                                  envelope: Envelope[Nomination]): Stack[NominateTracker] = Stack {
     setting =>
       if (tracker.lastSentEnvelope.isEmpty ||
-          Statement.newerThan(envelope.statement, tracker.lastSentEnvelope.get.statement)) {
+          Statement.newerThan(tracker.lastSentEnvelope.get.statement, envelope.statement)) {
         setting.connect.broadcastMessage(envelope)
         tracker.sentEnvelope(envelope)
       } else tracker

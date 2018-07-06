@@ -73,9 +73,9 @@ object Message {
 
     def build(): Nomination = {
       // voted and accepted should be disjoint, if eligible to both, put it into accepted
-      val votedList     = voted.toList
-      val filteredVoted = votedList.filter(x => !accepted.contains(x))
-      Nomination(ValueSet(filteredVoted: _*), ValueSet(accepted: _*))
+      //val votedList     = voted.toList
+      //val filteredVoted = votedList.filter(x => !accepted.contains(x))
+      Nomination(ValueSet(voted: _*), ValueSet(accepted: _*))
     }
 
     def buildAsMessage(): Message = build()
@@ -122,13 +122,16 @@ object Message {
             case Seq(l, r) => l <= r
           }
       }
-      def isSane: Boolean = message match {
+      /**
+        *@param self if the message is sent by self
+        */
+      def isSane(self: Boolean): Boolean = message match {
         case x @ Nomination(voted, accepted) =>
           // values of voted and accepted should ordered ASC
           x.notEmpty && isAsc(voted) && isAsc(accepted)
 
         case Prepare(ballot, prepare, preparePrime, hCounter, cCounter) =>
-          val cond1 = ballot.notNull
+          val cond1 = self || ballot.notNull
           val cond2 = if (prepare.notNull) {
             prepare <= ballot
           } else true
@@ -136,9 +139,19 @@ object Message {
             prepare.notNull && preparePrime < prepare && (cCounter <= hCounter && hCounter <= ballot.counter)
           } else true
           cond1 && cond2 && cond3
+
+        case Commit(ballot, _, hCounter, cCounter) =>
+          // c <= h <= b
+          val cond1 = ballot.counter > 0
+          val cond2 = hCounter <= ballot.counter
+          val cond3 = cCounter <= hCounter
+          cond1 && cond2 && cond3
+
+        case Externalize(commit, hCounter) =>
+          commit.counter > 0 && hCounter >= commit.counter
       }
 
-      def notSane: Boolean = !isSane
+      def notSane(self: Boolean): Boolean = !isSane(self)
     }
   }
 }

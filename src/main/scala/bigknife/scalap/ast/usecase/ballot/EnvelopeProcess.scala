@@ -23,26 +23,34 @@ trait EnvelopeProcess[F[_]] extends BallotCore[F] {
     * @param envelope coming envelope that node received
     * @return envelope.state
     */
-  override def processBallotEnvelope[M <: BallotMessage](nodeID: NodeID,
-                                     envelope: BallotEnvelope[M]): SP[F, Envelope.State] = {
-    val nodeID    = envelope.statement.nodeID
-    val slotIndex = envelope.statement.slotIndex
-    val statement = envelope.statement
-    val message   = statement.message
+  override def processBallotEnvelope[M <: BallotMessage](
+      nodeID: NodeID,
+      envelope: BallotEnvelope[M]): SP[F, Envelope.State] = {
+    val remoteNodeID = envelope.statement.nodeID
+    val slotIndex    = envelope.statement.slotIndex
+    val statement    = envelope.statement
+    val message      = statement.message
 
     for {
-      tracker  <- nodeStore.getBallotTracker(nodeID, slotIndex)
+      tracker <- nodeStore.getBallotTracker(nodeID, slotIndex)
+
       verified <- envelopeService.verifyEnvelopeSignature(envelope)
+      _        <- logService.debug(s"ballot envelope signature verified ? $verified", Some("blt-msg-proc"))
       valid    <- self.validateValues(statement)
-      state <- ifM[Envelope.State](
-        Envelope.State.invalid,
-        _ => verified && message.isSane && valid && self.isNewerStatement(statement, tracker)) {
+      _        <- logService.debug(s"ballot statement is valid ? $valid", Some("blt-msg-proc"))
+      sane     <- message.isSane(nodeID == remoteNodeID).pureSP[F]
+      _        <- logService.debug(s"ballot statement is sane ? $sane", Some("blt-msg-proc"))
+      newer    <- self.isNewerStatement(statement, tracker).pureSP[F]
+      _        <- logService.debug(s"ballot statement is newer ? $newer", Some("blt-msg-proc"))
+      state <- ifM[Envelope.State](Envelope.State.invalid, _ => verified && sane && valid && newer) {
         _ =>
           for {
             qSet <- nodeStore.getQuorumSet(nodeID)
             trackerWithState <- if (tracker.phase.notExternalize) for {
               trackerD11 <- recordEnvelope(tracker, envelope)
+              _ <- logService.debug(s"start to advance $nodeID $slotIndex ...", Some("blt-msg-proc"))
               trackerD12 <- self.advanceSlot(trackerD11, qSet, statement)
+              _ <- logService.debug(s"advanced $nodeID $slotIndex", Some("blt-msg-proc"))
             } yield (trackerD12, Envelope.State.valid)
             else
               for {

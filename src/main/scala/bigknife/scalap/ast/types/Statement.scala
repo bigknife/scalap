@@ -12,6 +12,7 @@ sealed trait Statement[+M <: Message] {
 object Statement {
   sealed trait NominationStatement                          extends Statement[Message.Nomination]
   sealed trait BallotStatement[+M <: Message.BallotMessage] extends Statement[M] {
+    def order: Int = message.order
   }
 
   case class Nominate(
@@ -49,28 +50,53 @@ object Statement {
              Message.nominationBuilder().build())
 
   def newerThan[M <: Message](old: Statement[M], n: Statement[M]): Boolean = {
-    (old.message, n.message) match {
-      case x@(Message.Nomination(oldVoted, oldAccepted), Message.Nomination(voted, accepted)) =>
-        if (voted.hasGrownEqualFrom(oldVoted) && accepted.hasGrownEqualFrom(oldAccepted)) {
-          voted.hasGrownFrom(oldVoted) || accepted.hasGrownFrom(oldAccepted)
-        } else false
-      case (m1, m2)  => m1 match {
-        case x1: Message.BallotMessage => m2 match {
-          case x2: Message.BallotMessage =>
-            if (x1.order != x2.order) x2.order > x1.order
-            else {
-              // can't have duplicate Externalized msg
-              if (x2.isExternalize) false
-              else {
-                if (x2.isCommit) {
-                  
-                }
-              }
-            }
+    old match {
+      case xOld: Statement.Nominate =>
+        n match {
+          case xN: Statement.Nominate =>
+            val voted = xN.message.voted
+            val oldVoted = xOld.message.voted
+            val accepted = xN.message.accepted
+            val oldAccepted = xOld.message.accepted
+            if (voted.hasGrownEqualFrom(oldVoted) &&
+              accepted.hasGrownEqualFrom(oldAccepted)) {
+              voted.hasGrownFrom(oldVoted) || accepted.hasGrownFrom(oldAccepted)
+            } else false
           case _ => false
         }
-        case _ => false
-      }
+      case xOld: Statement.BallotStatement[_] =>
+        n match {
+          case xN: Statement.BallotStatement[_] if xN.order != xOld.order => xN.order > xOld.order
+          case xN: Statement.Prepare => xOld match {
+            case xOld1: Statement.Prepare =>
+              if(xOld1.message.ballot < xN.message.ballot) true
+              else if(xOld1.message.ballot == xN.message.ballot) {
+                if(xOld1.message.prepared < xN.message.prepared) true
+                else if (xOld1.message.prepared == xN.message.prepared) {
+                  if (xOld1.message.preparedPrime < xN.message.preparedPrime) true
+                  else if (xOld1.message.preparedPrime == xN.message.preparedPrime) {
+                    xOld1.message.hCounter < xN.message.hCounter
+                  } else false
+                } else false
+              } else false
+            case _ => false
+          }
+
+          case xN: Statement.Commit => xOld match {
+            case xOld1: Statement.Commit =>
+              if (xOld1.message.ballot < xN.message.ballot) true
+              else if (xOld1.message.ballot == xN.message.ballot) {
+                if(xOld1.message.preparedCounter == xN.message.preparedCounter) xOld1.message.hCounter < xN.message.hCounter
+                else xOld1.message.preparedCounter < xN.message.preparedCounter
+              }
+              else false
+            case _ => false
+          }
+          case _: Statement.Externalize => false
+
+          case _ => false
+        }
+      case _ => false
     }
   }
 

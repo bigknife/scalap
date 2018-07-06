@@ -19,10 +19,11 @@ trait EnvelopeProcessHelper[F[_]] extends BallotBaseHelper[F] {
     */
   def isNewerStatement[M <: BallotMessage](statement: BallotStatement[M],
                                            tracker: BallotTracker): Boolean = {
-    val old: BallotEnvelope[BallotMessage] = tracker.latestBallotEnvelope(statement.nodeID)
+    //val old: BallotEnvelope[BallotMessage] = tracker.latestBallotEnvelope(statement.nodeID)
 
-    !tracker.latestBallotEnvelope.contains(statement.nodeID) || Statement.newerThan(old.statement,
-                                                                                    statement)
+    !tracker.latestBallotEnvelope.contains(statement.nodeID) || Statement.newerThan(
+      tracker.latestBallotEnvelope(statement.nodeID).statement,
+      statement)
 
   }
 
@@ -162,6 +163,7 @@ trait EnvelopeProcessHelper[F[_]] extends BallotBaseHelper[F] {
       // if acceptedOpt is defined try to accept prepared
       for {
         acceptedOpt <- acceptedOptSP
+        _ <- logService.info(s"federated accepted: $acceptedOpt", Some("blt-atm-pa"))
         trackerD <- ifM[Delta[BallotTracker]](Delta.unchanged(tracker), _ => acceptedOpt.isDefined) {
           _ =>
             for {
@@ -482,17 +484,17 @@ trait EnvelopeProcessHelper[F[_]] extends BallotBaseHelper[F] {
     }
   }
 
-  private def attempBump(tracker: BallotTracker, quorumSet: QuorumSet): SP[F, Unit] = {
+  private def attemptBump(tracker: BallotTracker, quorumSet: QuorumSet): SP[F, Unit] = {
     if (tracker.isExternalizePhase) ().pureSP[F]
     else {
       def isVBlocking(counter: Int): Boolean = {
         val nodeIDs = tracker.latestBallotEnvelope
           .filter {
-            case (nodeID, ballotEvelope) =>
-              ballotEvelope.statement.message match {
+            case (_, ballotEnvelope) =>
+              ballotEnvelope.statement.message match {
                 case x: Message.Prepare     => counter < x.ballot.counter
                 case x: Message.Commit      => counter < x.ballot.counter
-                case x: Message.Externalize => counter < Int.MaxValue
+                case _: Message.Externalize => counter < Int.MaxValue
               }
           }
           .keys
@@ -536,15 +538,19 @@ trait EnvelopeProcessHelper[F[_]] extends BallotBaseHelper[F] {
   def advanceSlot[M <: BallotMessage](tracker: BallotTracker,
                                       quorumSet: QuorumSet,
                                       statement: BallotStatement[M]): SP[F, BallotTracker] = {
-    //todo: attempt to bump state
-    //todo: send latest envelope(if not sent)
     for {
       pa           <- attemptPreparedAccept(tracker, quorumSet, statement)
+      _            <- logService.debug(s"attempted to prepare accept: $pa", Some("blt-advance"))
       pc           <- attemptPreparedConfirm(pa.data, quorumSet, statement)
+      _            <- logService.debug(s"attempted to prepare confirm: $pc", Some("blt-advance"))
       ca           <- attemptCommitAccept(pc.data, quorumSet, statement)
+      _            <- logService.debug(s"attempted to commit accept: $ca", Some("blt-advance"))
       cc           <- attemptCommitConfirm(ca.data, quorumSet, statement)
-      _            <- attempBump(tracker, quorumSet)
-      trackerFinal <- checkHeardFromQuorum(tracker)
+      _            <- logService.debug(s"attempted to commit confirm: $cc", Some("blt-advance"))
+      _            <- attemptBump(cc.data, quorumSet)
+      _            <- logService.debug(s"attempted to bump: ${cc.data}", Some("blt-advance"))
+      trackerFinal <- checkHeardFromQuorum(cc.data)
+      _            <- logService.debug(s"checked heard from quorum: $trackerFinal", Some("blt-advance"))
     } yield trackerFinal.data
   }
 
