@@ -36,7 +36,28 @@ override def signData(bytes: Array[Byte], nodeID: NodeID): Signature = Signature
     */
   override def broadcastMessage[M <: Message](envelope: Envelope[M]): Unit = {
     println("==========================================")
-    println(s"    Broadcast Message: $envelope")
+    println(s"    Broadcast Message: ${envelope.statement.nodeID}-${envelope.statement.slotIndex}")
+    envelope.statement.message match {
+      case x: Message.Nomination =>
+        println(s"    Nomination: ${x.voted}")
+      case x: Message.Prepare =>
+        println(s"    Prepare: ")
+        println(s"        ballot = ${x.ballot}")
+        println(s"        prepared = ${x.prepared}")
+        println(s"        preparedPrime = ${x.preparedPrime}")
+        println(s"        hCounter = ${x.hCounter}")
+        println(s"        cCounter = ${x.cCounter}")
+      case x: Message.Commit =>
+        println(s"    Commit:")
+        println(s"        ballot = ${x.ballot}")
+        println(s"        hCounter = ${x.hCounter}")
+        println(s"        cCounter = ${x.cCounter}")
+        println(s"        preparedCounter = ${x.preparedCounter}")
+      case x: Message.Externalize =>
+        println(s"    Externalize:")
+        println(s"       commit = ${x.commit}")
+        println(s"       hCounter = ${x.hCounter}")
+    }
     println("==========================================")
   }
 

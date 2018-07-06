@@ -67,6 +67,31 @@ class SCPSpec extends FunSuite with GivenWhenThen {
                                                Ballot(1, value),
                                                hCounter = 1)
 
+    val prepareEnv10 =
+      simple4nodes.createBallotPrepareEnvelope(1,
+        slotIndex,
+        Ballot(1, value),
+        Ballot(1, value),
+        Ballot(1, value),
+        hCounter = 1,
+        cCounter = 1)
+    val prepareEnv11 =
+      simple4nodes.createBallotPrepareEnvelope(2,
+        slotIndex,
+        Ballot(1, value),
+        Ballot(1, value),
+        Ballot(1, value),
+        hCounter = 1,
+        cCounter = 1)
+    val prepareEnv12 =
+      simple4nodes.createBallotPrepareEnvelope(3,
+        slotIndex,
+        Ballot(1, value),
+        Ballot(1, value),
+        Ballot(1, value),
+        hCounter = 1,
+        cCounter = 1)
+
     When("run nominate values program")
     val program = for {
       _ <- scp.cacheQuorumSet(simple4nodes.getQuorumSet(1))
@@ -77,25 +102,47 @@ class SCPSpec extends FunSuite with GivenWhenThen {
       _ <- scp.nominate(localNodeID, slotIndex, round = 3, value, Value.bottom)
       _ <- info("nominate value 1").pureSP[Model.Op]
 
+      x0 <- scp.getNominateTracker(localNodeID, slotIndex)
+      y0   <- scp.getBallotTracker(localNodeID, slotIndex)
+
       _ <- scp.processEnvelope(localNodeID, env1) // assume localNodeID got remote envelopes (vote) from v1,2,3
       _ <- scp.processEnvelope(localNodeID, env2)
       _ <- scp.processEnvelope(localNodeID, env3)
+
+      x1 <- scp.getNominateTracker(localNodeID, slotIndex)
+      y1   <- scp.getBallotTracker(localNodeID, slotIndex)
 
       _ <- scp.processEnvelope(localNodeID, acceptEnv1) // assume localNodeID got remote envelopes (accept) from v1,2,3
       _ <- scp.processEnvelope(localNodeID, acceptEnv2)
       _ <- scp.processEnvelope(localNodeID, acceptEnv3)
 
+      x2 <- scp.getNominateTracker(localNodeID, slotIndex)
+      y2   <- scp.getBallotTracker(localNodeID, slotIndex)
+
       _ <- scp.processEnvelope(localNodeID, prepareEnv1) // assume localNodeID got remote envelopes (ballot-prepare) from v1,2,3
       _ <- scp.processEnvelope(localNodeID, prepareEnv2)
       _ <- scp.processEnvelope(localNodeID, prepareEnv3)
+
+      x3 <- scp.getNominateTracker(localNodeID, slotIndex)
+      y3   <- scp.getBallotTracker(localNodeID, slotIndex)
 
       _ <- scp.processEnvelope(localNodeID, prepareEnv4) // assume localNodeID got remote envelopes (ballot-prepare) from v1,2,3
       _ <- scp.processEnvelope(localNodeID, prepareEnv5)
       _ <- scp.processEnvelope(localNodeID, prepareEnv6)
 
+      x4 <- scp.getNominateTracker(localNodeID, slotIndex)
+      y4   <- scp.getBallotTracker(localNodeID, slotIndex)
+
       _ <- scp.processEnvelope(localNodeID, prepareEnv7) // assume localNodeID got remote envelopes (ballot-prepare) from v1,2,3
       _ <- scp.processEnvelope(localNodeID, prepareEnv8)
       _ <- scp.processEnvelope(localNodeID, prepareEnv9)
+
+      x5 <- scp.getNominateTracker(localNodeID, slotIndex)
+      y6   <- scp.getBallotTracker(localNodeID, slotIndex)
+
+      _ <- scp.processEnvelope(localNodeID, prepareEnv10) // assume localNodeID got remote envelopes (ballot-prepare) from v1,2,3
+      _ <- scp.processEnvelope(localNodeID, prepareEnv11)
+      _ <- scp.processEnvelope(localNodeID, prepareEnv12)
 
       nominateTracker <- scp.getNominateTracker(localNodeID, slotIndex)
       ballotTracker   <- scp.getBallotTracker(localNodeID, slotIndex)

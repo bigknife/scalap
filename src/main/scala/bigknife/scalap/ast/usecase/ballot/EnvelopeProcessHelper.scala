@@ -224,7 +224,7 @@ trait EnvelopeProcessHelper[F[_]] extends BallotBaseHelper[F] {
       // if newH has been found , continue to find newC, then set confirmed, or nothing to do
       // find from the rest (drop high and higher)
       def newCommitBallotOptSP(high: Ballot): SP[F, Option[Ballot]] = {
-        val rest = candidates.dropWhile(b => b >= high)
+        val rest = candidates.dropWhile(b => b > high)
         // h should > p and p'
         val p = tracker.commitBallotIsNull &&
           (tracker.preparedBallotIsNull || !high.lessAndIncompatible(tracker.prepared)) &&

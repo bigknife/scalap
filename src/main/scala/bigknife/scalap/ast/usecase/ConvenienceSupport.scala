@@ -41,7 +41,8 @@ trait ConvenienceSupport[F[_]] {
     val acceptedNodes: Set[NodeID] = known
       .filter {
         case (_, envelope) =>
-          acceptPredicate(envelope.statement)
+          val ret = acceptPredicate(envelope.statement)
+          ret
       }
       .keys
       .toSet
