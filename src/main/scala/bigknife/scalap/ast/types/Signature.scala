@@ -1,7 +1,7 @@
 package bigknife.scalap.ast.types
 
-case class Signature(bytes: Array[Byte])
+case class Signature(bytes: Array[Byte]) extends OpaqueBytes
 
 object Signature {
-  val Empty: Signature = Signature(Array.emptyByteArray)
+  def empty: Signature = Signature(Array.emptyByteArray)
 }

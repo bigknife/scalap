@@ -1,31 +1,34 @@
 package bigknife.scalap.ast.types
 
-/** the state tracker of nomination protocol
+/**
+  * Nomination process state tracker
   */
 case class NominateTracker(
-    voted: Vector[Value], // X, the set of value that node v has voted to nominate
-    accepted: Vector[Value], // Y, the set of value that node v has accepted as nominated
-    candidates: Vector[Value], // Z, the set of value that node v considers candidate values
-    latestNominations: Map[Node.ID, NominationMessage], // the set of latest Nomination message received from each node
-    roundNumber: Int,
-    lastEmittedMessage: Option[NominationMessage], // last message emitted by this node
-    roundLeaders: Vector[Node.ID], // nodes from quorum set that have the highest priority this round
-    nominationStarted: Boolean, // true if nominate protocol start
-    latestCompositeCandidate: Option[Value], // the latest candidate value
-    previousValue: Option[Value] // the value from the previous slot
-)
+    nodeID: NodeID,
+    slotIndex: SlotIndex,
+    nominationStarted: Boolean,
+    round: Int,
+    roundLeaders: Set[NodeID],
+    previousValue: Value,
+    nomination: Message.Nomination,
+    candidates: ValueSet,
+    latestNominations: Map[NodeID, Envelope[Message.Nomination]],
+    lastSentEnvelope: Option[Envelope[Message.Nomination]]
+) {
+  def sentEnvelope(envelope: Envelope[Message.Nomination]): NominateTracker =
+    copy(lastSentEnvelope = Some(envelope))
+}
 
 object NominateTracker {
-  val Empty: NominateTracker = NominateTracker(
-    Vector.empty,
-    Vector.empty,
-    Vector.empty,
-    Map.empty,
-    0,
-    None,
-    Vector.empty,
-    nominationStarted = false,
-    None,
-    None
-  )
+  def newTracker(nodeID: NodeID, slotIndex: SlotIndex): NominateTracker =
+    NominateTracker(nodeID,
+                    slotIndex,
+                    nominationStarted = false,
+                    0,
+                    Set.empty[NodeID],
+                    Value.bottom,
+                    Message.nominationBuilder().build(),
+                    ValueSet.empty,
+                    Map.empty,
+                    None)
 }

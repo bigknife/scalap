@@ -1,23 +1,42 @@
 package bigknife.scalap.ast
 
+import bigknife.sop.SP
+
 package object types {
+  type ValueSet = LinkedHashSet[Value]
+  object ValueSet {
+    def apply(values: Value*): ValueSet = {
+      val empty = LinkedHashSet.empty[Value]("Values")
+      values.foldLeft(empty) { (acc, n) =>
+        acc + n
+      }
+    }
 
-  type StatementMessage  = Message[Message.Statement]
-  type NominationMessage = Message[Message.NominationStatement]
-  type BallotMessage     = Message[Message.BallotStatement]
-  type MessageState      = Message.State
-
-  type NominationStatement        = Message.NominationStatement
-  type BallotStatement            = Message.BallotStatement
-  type BallotPrepareStatement     = Message.Prepare
-  type BallotConfirmStatement     = Message.Confirm
-  type BallotExternalizeStatement = Message.Externalize
-
-  type StatementPredict = Message.Statement.Predict
-
-  object MessageState {
-    def valid: MessageState   = Message.State.valid
-    def invalid: MessageState = Message.State.invalid
+    def empty: ValueSet = apply()
   }
 
+  type NominateNewValuesResult  = BoolResult[NominateTracker]
+  type NominationEnvelope       = Envelope[Message.Nomination]
+  type NominationEnvelopeResult = BoolResult[NominationEnvelope]
+
+  type BallotMessage                        = Message.BallotMessage
+  type BallotEnvelope[+M <: BallotMessage]  = Envelope.BallotEnvelope[M]
+  type BallotStatement[+M <: BallotMessage] = Statement.BallotStatement[M]
+
+  type NominationStatement = Statement[Message.Nomination]
+
+  type Predicate[A]                     = A => Boolean
+  type SPPredicate[F[_], A]             = A => SP[F, Boolean]
+  type StatementPredicate[M <: Message] = Predicate[Statement[M]]
+
+  type BallotPhase = BallotTracker.Phase
+  val ballotPhrasePrepare: BallotPhase     = BallotTracker.Phase.Prepare
+  val ballotPhraseConfirm: BallotPhase     = BallotTracker.Phase.Commit
+  val ballotPhraseExternalize: BallotPhase = BallotTracker.Phase.Externalize
+
+  object implicits
+      extends Delta.Syntax
+      with Message.Ops
+      with OpaqueBytes.Syntax
+      with OpaqueBytesTransformers
 }

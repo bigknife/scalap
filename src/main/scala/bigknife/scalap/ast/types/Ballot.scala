@@ -1,34 +1,25 @@
 package bigknife.scalap.ast.types
 
-case class Ballot(
-    counter: Int,
-    value: Value
-) extends Ordered[Ballot] {
+case class Ballot(counter: Int, value: Value) extends Ordered[Ballot] {
   override def compare(that: Ballot): Int = {
-    val c = this.counter - that.counter
-    if (c != 0) c
-    else this.value.compare(that.value)
+    val c1 = this.counter - that.counter
+    if (c1 == 0) {
+      this.value.asHex().compare(that.value.asHex())
+    } else c1
   }
 
-  override def hashCode(): Int = counter.hashCode() + value.hashCode()
+  def isNull: Boolean = this == Ballot.Null
+  def notNull: Boolean = !isNull
 
-  override def equals(obj: scala.Any): Boolean = obj match {
-    case Ballot(c, v) => this.counter == c && this.value == v
-    case _            => false
-  }
+  def compatible(that: Ballot): Boolean          = this.value == that.value
+  def incompatible(that: Ballot): Boolean        = this.value != that.value
+  def lessAndCompatible(that: Ballot): Boolean   = this <= that && compatible(that)
+  def lessAndIncompatible(that: Ballot): Boolean = this <= that && incompatible(that)
 
-  // see the paper 6.2
-  def lessThan(that: Ballot): Boolean     = this.counter <= that.counter
-  def compatible(that: Ballot): Boolean   = this.value == that.value
-  def incompatible(that: Ballot): Boolean = this.value != that.value
-
-  def lessThanAndIncompatible(that: Ballot): Boolean = lessThan(that) && incompatible(that)
-  def lessThanAndCompatible(that: Ballot): Boolean   = lessThan(that) && compatible(that)
-
-  def isZero: Boolean = this == Ballot.NullBallot
-  def isNotZero: Boolean = this != Ballot.NullBallot
+  def ifNullThen(other: Ballot): Ballot = if(isNull) other else this
 }
 
 object Ballot {
-  val NullBallot: Ballot = Ballot(0, Value.Bottom)
+  val Null: Ballot = Ballot(0, Value.bottom)
+  def max(value: Value): Ballot = Ballot(Int.MaxValue, value)
 }
