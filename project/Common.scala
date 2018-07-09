@@ -8,7 +8,7 @@ object Common {
   lazy val settings = Seq(
     organization := "bigknife",
     scalaVersion := "2.12.4",
-    crossScalaVersions := Seq("2.11.12", "2.12.4"),
+    //crossScalaVersions := Seq("2.11.12", "2.12.4"),
     resolvers ++= Seq(
       resolver.local,
       resolver.bigknife
@@ -71,6 +71,7 @@ object Common {
     addCompilerPlugin("org.scalameta"  % "paradise"        % "3.0.0-M10" cross CrossVersion.full),
     licenses += ("Apache-2.0", url("https://opensource.org/licenses/Apache-2.0")),
     bintrayRepository := "maven",
+    publishArtifact in (Compile, packageDoc) := false,
     libraryDependencies ++= all.scalatest,
     libraryDependencies ++= all.log
   )
