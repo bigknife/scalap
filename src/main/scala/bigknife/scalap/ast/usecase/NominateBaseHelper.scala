@@ -17,14 +17,21 @@ trait NominateBaseHelper[F[_]] {
       for {
         _  <- nodeStore.saveNominateTracker(nodeID, tracker)
         st <- self.processNominationEnvelope(nodeID, msgResult.data)
-        _  <- logService.info(s"processed nomination message locally: $st", Some("nom-msg-proc"))
+        _  <- logService.info(s"processed nomination message locally: $st", Some("nom-msg-emit"))
         ret <- if (st == Envelope.State.Valid) for {
-          _ <- logService.info(s"start to broadcast envelope: ${msgResult.data}",
+          _ <- logService.info(s"start to broadcast envelope",
                                Some("nom-msg-proc"))
-          nt <- nominateService.broadcastEnvelope(tracker, msgResult.data): SP[F, NominateTracker]
-          _  <- logService.info(s"broadcasted envelope: ${msgResult.data}", Some("nom-msg-proc"))
+          needBroadcast <- nominateService.needBroadcastEnvelope(tracker, msgResult.data)
+          nt <- if (needBroadcast) for {
+            x <- nominateService.broadcastEnvelope(tracker, msgResult.data): SP[F, NominateTracker]
+            _  <- logService.info(s"has broadcast envelope", Some("nom-msg-emit"))
+          } yield x else for {
+            _  <- logService.info(s"no need to broadcast envelope", Some("nom-msg-emit")): SP[F, Unit]
+          } yield tracker
         } yield nt
-        else tracker.pureSP[F]
+        else for {
+          _ <- logService.info("DOES NOT broadcast envelope, because invalid locally running result"): SP[F, Unit]
+        } yield tracker
       } yield ret
     } else tracker.pureSP[F]
   }

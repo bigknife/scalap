@@ -17,6 +17,11 @@ case class NominateTracker(
 ) {
   def sentEnvelope(envelope: Envelope[Message.Nomination]): NominateTracker =
     copy(lastSentEnvelope = Some(envelope))
+
+  lazy val logString: String = {
+    // for log, key info
+    s"nomination(v:${nomination.voted.size},a:${nomination.accepted.size},c:${candidates.size})"
+  }
 }
 
 object NominateTracker {

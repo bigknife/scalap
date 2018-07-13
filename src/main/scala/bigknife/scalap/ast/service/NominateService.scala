@@ -54,9 +54,18 @@ import bigknife.sop.implicits._
                                nomination: Message.Nomination): P[F, Envelope[Message.Nomination]]
 
   /**
-    * broadcast envelope to peers according to the conditions:
+    * need to broadcast an envelope ?
     * 1. no nomination envelope had been broadcast on the node
     * 2. nomination statement in the envelope is newer than last sent nomination envelope
+    *
+    * @param tracker tracker
+    * @param envelope envelope to emit
+    * @return
+    */
+  def needBroadcastEnvelope(tracker: NominateTracker,
+                            envelope: Envelope[Message.Nomination]): P[F, Boolean]
+  /**
+    * just broadcast to peers
     * @param envelope envelope with nomination statement
     * @return
     */

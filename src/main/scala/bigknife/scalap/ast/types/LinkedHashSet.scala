@@ -29,6 +29,8 @@ sealed trait LinkedHashSet[A] {
   def unsafeHeadValue(): A
 
   def sliding(count: Int): Iterator[Seq[A]]
+
+  def size: Int
 }
 
 object LinkedHashSet {
@@ -51,6 +53,8 @@ object LinkedHashSet {
     override def unsafeHeadValue(): A = data.head
 
     override def sliding(count: Int): Iterator[Seq[A]] = data.sliding(count)
+
+    override def size: Int = data.size
   }
 
   def empty[A](tag: String): LinkedHashSet[A] = SimpleLHS(Vector.empty, tag)

@@ -33,26 +33,31 @@ trait Nominating[F[_]] extends NominationCore[F] {
     // emit nomination message
 
     for {
-      _         <- logService.debug(s"start to nominate $valueToNominate to $nodeID[$slotIndex]", Some("nomination"))
+      _         <- logService.debug(s"==== START NOMINATING to $nodeID[$slotIndex] ====", Some("nominate"))
       quorumSet <- nodeStore.getQuorumSet(nodeID)
-      _         <- logService.debug(s"Got $quorumSet of nodeID=$nodeID", Some("nomination"))
+      _         <- logService.debug(s"Got $quorumSet of nodeID=$nodeID", Some("nominate"))
       tracker   <- nodeStore.getNominateTracker(nodeID, slotIndex)
       trackerWithLeaders <- nominateService.findRoundLeaders(tracker,
                                                              quorumSet,
                                                              round,
                                                              slotIndex,
                                                              previousValue)
-      _ <- logService.info(s"found round($round) leaders: ${trackerWithLeaders.roundLeaders}", Some("nomination"))
+      _ <- logService.info(s"found round($round) leaders: ${trackerWithLeaders.roundLeaders}",
+                           Some("nominate"))
       trackerResult <- nominateService.nominateNewValuesWithLeaders(trackerWithLeaders,
                                                                     nodeID,
                                                                     valueToNominate)
       _ <- logService.debug(
-        s"nominated  $valueToNominate to $nodeID[$slotIndex], result is $trackerResult", Some("nomination"))
+        s"nominated to $nodeID[$slotIndex], result is ${trackerResult.successful}",
+        Some("nominate"))
       msgResult <- self.createNominationMessage(nodeID, slotIndex, quorumSet, trackerResult)
       xTracker  <- self.emitNominationMessage(nodeID, trackerResult.data, msgResult)
-      _         <- logService.info(s"emitted nomination message: $xTracker", Some("nomination"))
       _         <- nodeStore.saveNominateTracker(nodeID, xTracker)
-      _         <- logService.debug(s"saved nomination tracker: $xTracker", Some("nomination"))
+      _ <- logService.debug(
+        s"saved nomination tracker voted size = ${xTracker.nomination.voted.size}, " +
+          s"accepted size = ${xTracker.nomination.accepted.size}",
+        Some("nominate"))
+      _ <- logService.debug(s"==== END NOMINATING to $nodeID[$slotIndex] ====", Some("nominate"))
     } yield msgResult.successful
   }
 }

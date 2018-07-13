@@ -14,7 +14,7 @@ class NominateServiceHandler extends NominateService.Handler[Stack] {
   private val log = LoggerFactory.getLogger(getClass)
 
   override def findRoundLeaders(tracker: NominateTracker,
-                                 quorumSet: QuorumSet,
+                                quorumSet: QuorumSet,
                                 round: Int,
                                 slotIndex: SlotIndex,
                                 previousValue: Value): Stack[NominateTracker] =
@@ -52,7 +52,7 @@ class NominateServiceHandler extends NominateService.Handler[Stack] {
             .build()
         )
         log.debug(
-          s"current node($nodeID) is a leader, vote the value, then tracker turns into $tracker")
+          s"current node($nodeID) is a leader, vote the value, then tracker turns into ${tracker.logString}")
         BoolResult(t, successful = true)
       } else {
         val nominations: Vector[Nomination] =
@@ -145,14 +145,17 @@ class NominateServiceHandler extends NominateService.Handler[Stack] {
       Envelope.NominationEnvelope(statement, signature)
     }
 
+  override def needBroadcastEnvelope(tracker: NominateTracker,
+                                     envelope: Envelope[Nomination]): Stack[Boolean] = Stack {
+    tracker.lastSentEnvelope.isEmpty ||
+    Statement.newerThan(tracker.lastSentEnvelope.get.statement, envelope.statement)
+  }
+
   override def broadcastEnvelope(tracker: NominateTracker,
                                  envelope: Envelope[Nomination]): Stack[NominateTracker] = Stack {
     setting =>
-      if (tracker.lastSentEnvelope.isEmpty ||
-          Statement.newerThan(tracker.lastSentEnvelope.get.statement, envelope.statement)) {
-        setting.connect.broadcastMessage(envelope)
-        tracker.sentEnvelope(envelope)
-      } else tracker
+      setting.connect.broadcastMessage(envelope)
+      tracker.sentEnvelope(envelope)
   }
 
   override def recordEnvelope(tracker: NominateTracker,
