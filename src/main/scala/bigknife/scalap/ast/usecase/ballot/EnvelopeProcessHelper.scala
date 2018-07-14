@@ -163,7 +163,9 @@ trait EnvelopeProcessHelper[F[_]] extends BallotBaseHelper[F] {
       // if acceptedOpt is defined try to accept prepared
       for {
         acceptedOpt <- acceptedOptSP
-        _           <- logService.info(s"federated accepted: $acceptedOpt", Some("blt-atm-pa"))
+        _ <- logService.info(
+          s"federated accepted: ${acceptedOpt.map(_.counter.toString).getOrElse("false")}",
+          Some("blt-atm-pa"))
         trackerD <- ifM[Delta[BallotTracker]](Delta.unchanged(tracker), _ => acceptedOpt.isDefined) {
           _ =>
             for {
