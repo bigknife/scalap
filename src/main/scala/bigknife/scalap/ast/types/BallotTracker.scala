@@ -14,6 +14,12 @@ case class BallotTracker(
     lastEmitEnvelope: Option[BallotEnvelope[Message.BallotMessage]],
     heardFromQuorum: Boolean
 ) {
+  def logString: String = {
+    s"{nodeID:$nodeID, slotIndex:${slotIndex.index}, phase:$phase," +
+      s"b:${current.counter},p:${prepared.counter},p':${preparedPrime.counter}," +
+      s"h:${high.counter},c:${commit.counter},heardFromQuorum:$heardFromQuorum}"
+  }
+
   def currentBallotIsNull: Boolean  = current.isNull
   def currentBallotNotNull: Boolean = current.notNull
 

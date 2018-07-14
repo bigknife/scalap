@@ -111,12 +111,11 @@ trait EnvelopeProcessHelper[F[_]] extends BallotBaseHelper[F] {
     else {
       val allCandidates = getPreparedCandidateBallots(tracker, hint)
       // we should do some filtering work. to reduce the ballots that can't help local to advance.
-      val candidates: Vector[Ballot] = allCandidates.toVector.filter {
-        b =>
-          val cond1 = tracker.isCommitPhase && !tracker.prepared.lessAndCompatible(b)
-          val cond2 = tracker.preparedPrimeBallotNotNull && (b <= tracker.preparedPrime)
-          val cond3 = tracker.preparedBallotNotNull && b.lessAndCompatible(tracker.prepared)
-          !(cond1 || cond2 || cond3)
+      val candidates: Vector[Ballot] = allCandidates.toVector.filter { b =>
+        val cond1 = tracker.isCommitPhase && !tracker.prepared.lessAndCompatible(b)
+        val cond2 = tracker.preparedPrimeBallotNotNull && (b <= tracker.preparedPrime)
+        val cond3 = tracker.preparedBallotNotNull && b.lessAndCompatible(tracker.prepared)
+        !(cond1 || cond2 || cond3)
       }.sorted
 
       // now, find a passed federated-accepted ballot to advance local
@@ -164,7 +163,7 @@ trait EnvelopeProcessHelper[F[_]] extends BallotBaseHelper[F] {
       // if acceptedOpt is defined try to accept prepared
       for {
         acceptedOpt <- acceptedOptSP
-        _ <- logService.info(s"federated accepted: $acceptedOpt", Some("blt-atm-pa"))
+        _           <- logService.info(s"federated accepted: $acceptedOpt", Some("blt-atm-pa"))
         trackerD <- ifM[Delta[BallotTracker]](Delta.unchanged(tracker), _ => acceptedOpt.isDefined) {
           _ =>
             for {
@@ -540,18 +539,24 @@ trait EnvelopeProcessHelper[F[_]] extends BallotBaseHelper[F] {
                                       quorumSet: QuorumSet,
                                       statement: BallotStatement[M]): SP[F, BallotTracker] = {
     for {
-      pa           <- attemptPreparedAccept(tracker, quorumSet, statement)
-      _            <- logService.debug(s"attempted to prepare accept: $pa", Some("blt-advance"))
-      pc           <- attemptPreparedConfirm(pa.data, quorumSet, statement)
-      _            <- logService.debug(s"attempted to prepare confirm: $pc", Some("blt-advance"))
-      ca           <- attemptCommitAccept(pc.data, quorumSet, statement)
-      _            <- logService.debug(s"attempted to commit accept: $ca", Some("blt-advance"))
-      cc           <- attemptCommitConfirm(ca.data, quorumSet, statement)
-      _            <- logService.debug(s"attempted to commit confirm: $cc", Some("blt-advance"))
+      _  <- logService.info(s"start advancing slot: ${tracker.logString}")
+      pa <- attemptPreparedAccept(tracker, quorumSet, statement)
+      _ <- logService.debug(s"attempted to prepare accept: ${pa.data.logString}",
+                            Some("blt-advance"))
+      pc <- attemptPreparedConfirm(pa.data, quorumSet, statement)
+      _ <- logService.debug(s"attempted to prepare confirm: ${pc.data.logString}",
+                            Some("blt-advance"))
+      ca <- attemptCommitAccept(pc.data, quorumSet, statement)
+      _ <- logService.debug(s"attempted to commit accept: ${ca.data.logString}",
+                            Some("blt-advance"))
+      cc <- attemptCommitConfirm(ca.data, quorumSet, statement)
+      _ <- logService.debug(s"attempted to commit confirm: ${cc.data.logString}",
+                            Some("blt-advance"))
       _            <- attemptBump(cc.data, quorumSet)
-      _            <- logService.debug(s"attempted to bump: ${cc.data}", Some("blt-advance"))
+      _            <- logService.debug(s"attempted to bump: ${cc.data.logString}", Some("blt-advance"))
       trackerFinal <- checkHeardFromQuorum(cc.data)
-      _            <- logService.debug(s"checked heard from quorum: $trackerFinal", Some("blt-advance"))
+      _ <- logService.debug(s"end advancing slot. checked heard from quorum: ${cc.data.logString}",
+                            Some("blt-advance"))
     } yield trackerFinal.data
   }
 
