@@ -43,7 +43,7 @@ trait Nominating[F[_]] extends NominationCore[F] {
       quorumSet <- nodeStore.getQuorumSet(nodeID)
       _         <- logService.debug(s"Got $quorumSet of nodeID=$nodeID", Some("nominate"))
       tracker   <- nodeStore.getNominateTracker(nodeID, slotIndex)
-      ret <- ifM[Boolean](false, _ => round > 1 && !tracker.nominationStarted) { _ =>
+      ret <- ifM[Boolean](false, _ => !(round > 1 && !tracker.nominationStarted)) { _ =>
         for {
           trackerWithLeaders <- nominateService.findRoundLeaders(tracker,
                                                                  quorumSet,

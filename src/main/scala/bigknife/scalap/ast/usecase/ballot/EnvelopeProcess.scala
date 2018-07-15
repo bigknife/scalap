@@ -32,7 +32,7 @@ trait EnvelopeProcess[F[_]] extends BallotCore[F] {
     val message      = statement.message
 
     for {
-      _        <- logService.info("start to process ballot envelope...")
+      _        <- logService.info(s"start to process ballot envelope $nodeID[${slotIndex}]...")
       tracker  <- nodeStore.getBallotTracker(nodeID, slotIndex)
       _        <- logService.info(s"current tracker: ${tracker.logString}")
       verified <- envelopeService.verifyEnvelopeSignature(envelope)
@@ -67,7 +67,7 @@ trait EnvelopeProcess[F[_]] extends BallotCore[F] {
               } yield trackerD11WithState
             _ <- nodeStore.saveBallotTracker(nodeID, trackerWithState._1)
             _ <- logService.info(
-              s"end processing ballot envelope with state ${trackerWithState._2}," +
+              s"end processing ballot envelope $nodeID[${slotIndex}] with state ${trackerWithState._2}," +
                 s"tracker: ${trackerWithState._1.logString}")
           } yield trackerWithState._2
       }

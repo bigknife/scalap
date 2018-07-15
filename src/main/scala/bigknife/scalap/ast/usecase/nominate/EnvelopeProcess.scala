@@ -25,7 +25,7 @@ trait EnvelopeProcess[F[_]] extends NominationCore[F] {
     val message      = statement.message
 
     for {
-      _       <- logService.debug("==== START PROCESS NOMINATION ENVELOPE ====", Some("nom-msg-proc"))
+      _       <- logService.debug(s"==== START PROCESS NOMINATION ENVELOPE $nodeID[${slotIndex}] ====", Some("nom-msg-proc"))
       tracker <- nodeStore.getNominateTracker(nodeID, slotIndex)
       _ <- logService.debug(s"tracker: ${tracker.logString}, envelped from $nodeID",
                             Some("nom-msg-proc"))
@@ -88,7 +88,7 @@ trait EnvelopeProcess[F[_]] extends NominationCore[F] {
             Some("nom-msg-proc"))
         } yield Envelope.State.valid
       }
-      _ <- logService.debug("==== END PROCESS NOMINATION ENVELOPE ====", Some("nom-msg-proc"))
+      _ <- logService.debug(s"==== END PROCESS NOMINATION ENVELOPE $nodeID[${slotIndex}] ====", Some("nom-msg-proc"))
 
     } yield state
   }

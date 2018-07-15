@@ -379,8 +379,8 @@ trait EnvelopeProcessHelper[F[_]] extends BallotBaseHelper[F] {
         trackerD1 <- emitCurrentStateStatement(trackerD0.data.copy(phase = Phase.Externalize),
                                                quorumSet)
         nominateTracker <- nodeStore.getNominateTracker(tracker.nodeID, tracker.slotIndex)
-        _               <- nominateService.stopNomination(nominateTracker)
-        _               <- nodeStore.saveNominateTracker(tracker.nodeID, nominateTracker)
+        stoppedNT       <- nominateService.stopNomination(nominateTracker)
+        _               <- nodeStore.saveNominateTracker(tracker.nodeID, stoppedNT)
         _ <- ballotService.externalizedValue(trackerD1.data.nodeID,
                                              trackerD1.data.slotIndex,
                                              trackerD1.data.commit.value)
