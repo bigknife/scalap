@@ -94,4 +94,28 @@ import bigknife.sop.implicits._
     * @return
     */
   def stopNomination(tracker: NominateTracker): P[F, NominateTracker]
+
+  /**
+    * timeout for next round nominating to wait.
+    * @param currentRound current round
+    * @return timeout for (currentRound + 1), in millis seconds.
+    */
+  def timeoutForNextRoundNominating(currentRound: Int): P[F, Long]
+
+  /**
+    * trigger next round nominating
+    * @param nodeID node id
+    * @param slotIndex slotIndex
+    * @param nextRound next round number
+    * @param valueToNominate value to nominate
+    * @param previousValue previous value
+    * @param afterMilliSeconds after millis seconds
+    * @return
+    */
+  def triggerNextRoundNominating(nodeID: NodeID,
+                                 slotIndex: SlotIndex,
+                                 nextRound: Int,
+                                 valueToNominate: Value,
+                                 previousValue: Value,
+                                 afterMilliSeconds: Long): P[F, Unit]
 }

@@ -171,6 +171,25 @@ class NominateServiceHandler extends NominateService.Handler[Stack] {
   override def stopNomination(tracker: NominateTracker): Stack[NominateTracker] = Stack {
     tracker.copy(nominationStarted = false)
   }
+
+  override def timeoutForNextRoundNominating(currentRound: Int): Stack[Long] = Stack { setting =>
+    setting.connect.timeoutForNextRoundNominating(currentRound)
+  }
+
+  override def triggerNextRoundNominating(nodeID: NodeID,
+                                          slotIndex: SlotIndex,
+                                          nextRound: Int,
+                                          valueToNominate: Value,
+                                          previousValue: Value,
+                                          afterMilliSeconds: Long): Stack[Unit] =
+    Stack { setting =>
+      setting.connect.triggerNextRoundNominating(nodeID,
+                                                 slotIndex,
+                                                 nextRound,
+                                                 valueToNominate,
+                                                 previousValue,
+                                                 afterMilliSeconds)
+    }
 }
 
 object NominateServiceHandler {
