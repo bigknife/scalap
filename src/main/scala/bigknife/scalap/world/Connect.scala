@@ -56,7 +56,38 @@ trait Connect {
     */
   def runAbandonBallot(nodeID: NodeID, slotIndex: SlotIndex, counter: Int): Unit
 
+  /**
+    * triggered when value externalized
+    * @param nodeID node id
+    * @param slotIndex slotIndex
+    * @param value value
+    */
   def valueExternalized(nodeID: NodeID, slotIndex: SlotIndex, value: Value): Unit
+
+  /**
+    * timeout for next round
+    * @param currentRound current round
+    * @return timeout milliseconds
+    */
+  def timeoutForNextRoundNominating(currentRound: Int): Long
+
+  /**
+    * trigger next round nominating
+    * @param nodeID node id
+    * @param slotIndex slotIndex
+    * @param nextRound next round number
+    * @param valueToNominate value to nominate
+    * @param previousValue previous value
+    * @param afterMilliSeconds after millis seconds
+    * @return
+    */
+  def triggerNextRoundNominating(nodeID: NodeID,
+                                 slotIndex: SlotIndex,
+                                 nextRound: Int,
+                                 valueToNominate: Value,
+                                 previousValue: Value,
+                                 afterMilliSeconds: Long): Unit
+
 }
 
 object Connect {
@@ -118,5 +149,20 @@ object Connect {
     override def runAbandonBallot(nodeID: NodeID, slotIndex: SlotIndex, counter: Int): Unit = ()
 
     override def valueExternalized(nodeID: NodeID, slotIndex: SlotIndex, value: Value): Unit = ()
+
+    /**
+      * timeout for next round
+      *
+      * @param currentRound current round
+      * @return timeout milliseconds
+      */
+    override def timeoutForNextRoundNominating(currentRound: Int): Long = Long.MaxValue
+
+    override def triggerNextRoundNominating(nodeID: NodeID,
+                                            slotIndex: SlotIndex,
+                                            nextRound: Int,
+                                            valueToNominate: Value,
+                                            previousValue: Value,
+                                            afterMilliSeconds: Long): Unit = ()
   }
 }

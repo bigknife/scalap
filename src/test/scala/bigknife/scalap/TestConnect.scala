@@ -3,7 +3,34 @@ package bigknife.scalap
 import bigknife.scalap.ast.types._
 import bigknife.scalap.world.Connect
 
-class TestConnect extends Connect{
+class TestConnect extends Connect {
+
+  /**
+    * timeout for next round
+    *
+    * @param currentRound current round
+    * @return timeout milliseconds
+    */
+  override def timeoutForNextRoundNominating(currentRound: Int): Long = currentRound * 1000L
+
+  /**
+    * trigger next round nominating
+    *
+    * @param nodeID            node id
+    * @param slotIndex         slotIndex
+    * @param nextRound         next round number
+    * @param valueToNominate   value to nominate
+    * @param previousValue     previous value
+    * @param afterMilliSeconds after millis seconds
+    * @return
+    */
+  override def triggerNextRoundNominating(nodeID: NodeID,
+                                          slotIndex: SlotIndex,
+                                          nextRound: Int,
+                                          valueToNominate: Value,
+                                          previousValue: Value,
+                                          afterMilliSeconds: Long): Unit = ()
+
   /**
     * try to extract a valid value from a not full validated value
     *
@@ -27,7 +54,7 @@ class TestConnect extends Connect{
     * @param nodeID node id
     * @return
     */
-override def signData(bytes: Array[Byte], nodeID: NodeID): Signature = Signature.empty
+  override def signData(bytes: Array[Byte], nodeID: NodeID): Signature = Signature.empty
 
   /**
     * broadcast message
@@ -77,10 +104,10 @@ override def signData(bytes: Array[Byte], nodeID: NodeID): Signature = Signature
     */
   override def combineValues(valueSet: ValueSet): Value = {
     // value should be test value
-    valueSet.foldLeft(TestValue("")) {(acc, n) =>
+    valueSet.foldLeft(TestValue("")) { (acc, n) =>
       n match {
         case TestValue(words) => acc.copy(acc.words + words)
-        case _ => acc
+        case _                => acc
       }
     }
   }

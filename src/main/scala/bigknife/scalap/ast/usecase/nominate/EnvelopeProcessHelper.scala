@@ -174,8 +174,9 @@ trait EnvelopeProcessHelper[F[_]] extends NominateBaseHelper[F] {
                                 tracker: NominateTracker): SP[F, NominateTracker] = {
     for {
       combinedCandidate <- nominateService.combineValues(tracker.candidates)
-      _ <- logService.debug(s"combined candidate value before bumpState: $combinedCandidate", Some("nom-msg-proc"))
-      _                 <- bumpState(nodeID, slotIndex, combinedCandidate, force = false)
+      _ <- logService.debug(s"combined candidate value before bumpState: $combinedCandidate",
+                            Some("nom-msg-proc"))
+      _ <- bumpState(nodeID, slotIndex, combinedCandidate, force = false)
     } yield tracker
   }
 

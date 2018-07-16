@@ -6,8 +6,14 @@ import bigknife.scalap.ast.types._
 import scala.collection._
 
 class NodeStoreHandler extends NodeStore.Handler[Stack] {
-  type TrackerKey          = (NodeID, SlotIndex)
+  type TrackerKey          = String //(NodeID, SlotIndex)
   type HistoricalStatement = (Statement[Message], Long)
+
+  private def buildTrackKey(nodeID: NodeID, slotIndex: SlotIndex): TrackerKey = {
+    nodeID.asHex() + slotIndex.toString
+  }
+
+
 
   private val nominateTrackerStore: mutable.Map[TrackerKey, NominateTracker] = mutable.Map.empty
   private val ballotTrackerStore: mutable.Map[TrackerKey, BallotTracker]     = mutable.Map.empty
@@ -18,7 +24,7 @@ class NodeStoreHandler extends NodeStore.Handler[Stack] {
 
   override def getNominateTracker(nodeID: NodeID, slotIndex: SlotIndex): Stack[NominateTracker] =
     Stack {
-      val key = (nodeID, slotIndex)
+      val key = buildTrackKey(nodeID, slotIndex)
       if (nominateTrackerStore.contains(key)) {
         nominateTrackerStore(key)
       } else {
@@ -30,7 +36,7 @@ class NodeStoreHandler extends NodeStore.Handler[Stack] {
 
   override def getBallotTracker(nodeID: NodeID, slotIndex: SlotIndex): Stack[BallotTracker] =
     Stack {
-      val key = (nodeID, slotIndex)
+      val key = buildTrackKey(nodeID, slotIndex)
       if (ballotTrackerStore.contains(key)) {
         ballotTrackerStore(key)
       } else {
@@ -68,13 +74,13 @@ class NodeStoreHandler extends NodeStore.Handler[Stack] {
 
   override def saveNominateTracker(nodeID: NodeID, nominateTracker: NominateTracker): Stack[Unit] =
     Stack {
-      nominateTrackerStore.put((nodeID, nominateTracker.slotIndex), nominateTracker)
+      nominateTrackerStore.put(buildTrackKey(nodeID, nominateTracker.slotIndex), nominateTracker)
       ()
     }
 
   override def saveBallotTracker(nodeID: NodeID, ballotTracker: BallotTracker): Stack[Unit] =
     Stack {
-      ballotTrackerStore.put((nodeID, ballotTracker.slotIndex), ballotTracker)
+      ballotTrackerStore.put(buildTrackKey(nodeID, ballotTracker.slotIndex), ballotTracker)
       ()
     }
 
