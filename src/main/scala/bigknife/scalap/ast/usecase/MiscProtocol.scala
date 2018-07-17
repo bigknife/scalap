@@ -16,4 +16,12 @@ trait MiscProtocol[F[_]] {
 
   def cacheQuorumSet(quorumSet: QuorumSet): SP[F, Unit] =
     nodeStore.cacheQuorumSet(quorumSet)
+
+  def initialize(): SP[F, Unit] = model.nodeStore.init()
+
+  def quorumSetDiscovered(nodeID: NodeID, quorumSet: QuorumSet): SP[F, Unit]= for {
+    _ <- logService.info(s"found quorum set of nodeID($nodeID)")
+    _ <- nodeStore.cacheQuorumSet(quorumSet)
+  } yield ()
+
 }

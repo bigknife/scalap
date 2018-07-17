@@ -23,6 +23,11 @@ class NodeStoreHandler extends NodeStore.Handler[Stack] {
   private val quorumSetStore: mutable.Map[Hash, QuorumSet] = mutable.Map.empty
 
   override def init(): Stack[Unit] = Stack { setting =>
+    // setting's register quorum set must be cached
+    setting.presetQuorumSets.values.foreach { quorumSet =>
+      quorumSetStore.put(quorumSet.hash, quorumSet)
+    }
+
     val qs: QuorumSet = setting.presetQuorumSets(setting.localNodeID)
     setting.connect.broadcastQuorumSet(setting.localNodeID, qs)
   }

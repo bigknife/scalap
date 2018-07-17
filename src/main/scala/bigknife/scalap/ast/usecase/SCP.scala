@@ -23,10 +23,6 @@ trait SCP[F[_]] extends NominationProtocol[F] with BallotProtocol[F] with MiscPr
       case x: Envelope.BallotEnvelope[_] => processBallotEnvelope(nodeID, x)
     }
   }
-
-  def initialize(): SP[F, Unit] = for {
-    _ <- model.nodeStore.init()
-  } yield ()
 }
 
 object SCP {
