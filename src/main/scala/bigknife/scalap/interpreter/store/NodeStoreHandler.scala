@@ -22,6 +22,11 @@ class NodeStoreHandler extends NodeStore.Handler[Stack] {
     mutable.ListBuffer.empty
   private val quorumSetStore: mutable.Map[Hash, QuorumSet] = mutable.Map.empty
 
+  override def init(): Stack[Unit] = Stack { setting =>
+    val qs: QuorumSet = setting.presetQuorumSets(setting.localNodeID)
+    setting.connect.broadcastQuorumSet(setting.localNodeID, qs)
+  }
+
   override def getNominateTracker(nodeID: NodeID, slotIndex: SlotIndex): Stack[NominateTracker] =
     Stack {
       val key = buildTrackKey(nodeID, slotIndex)

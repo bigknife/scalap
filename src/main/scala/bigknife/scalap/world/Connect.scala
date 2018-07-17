@@ -37,6 +37,13 @@ trait Connect {
   def broadcastMessage[M <: Message](envelope: Envelope[M]): Unit
 
   /**
+    * broad node quorum set
+    * @param nodeID node
+    * @param quorumSet quorum set
+    */
+  def broadcastQuorumSet(nodeID: NodeID, quorumSet: QuorumSet): Unit
+
+  /**
     * verify signature of an envelope
     * @param envelope envelope
     * @return
@@ -92,6 +99,15 @@ trait Connect {
 
 object Connect {
   def dummy: Connect = new Connect {
+
+
+    /**
+      * broad node quorum set
+      *
+      * @param nodeID    node
+      * @param quorumSet quorum set
+      */
+    override def broadcastQuorumSet(nodeID: NodeID, quorumSet: QuorumSet): Unit = ()
 
     /**
       * try to extract a valid value from a not full validated value
