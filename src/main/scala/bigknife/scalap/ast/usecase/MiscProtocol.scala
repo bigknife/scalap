@@ -19,9 +19,13 @@ trait MiscProtocol[F[_]] {
 
   def initialize(): SP[F, Unit] = model.nodeStore.init()
 
-  def quorumSetDiscovered(nodeID: NodeID, quorumSet: QuorumSet): SP[F, Unit]= for {
-    _ <- logService.info(s"found quorum set of nodeID($nodeID)")
-    _ <- nodeStore.cacheQuorumSet(quorumSet)
-  } yield ()
+  def quorumSetsUpdated(registeredQuorumSets: Map[NodeID, QuorumSet]): SP[F, Unit]=  {
+    registeredQuorumSets.foldLeft(().pureSP[F]) {(acc,n) =>
+      for {
+        _ <- logService.info(s"update QuorumSet of ${n._1}")
+        _ <- nodeStore.cacheQuorumSet(n._2)
+      } yield ()
+    }
+  }
 
 }
