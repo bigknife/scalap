@@ -3,9 +3,14 @@ package store
 
 import bigknife.scalap.ast.store.NodeStore
 import bigknife.scalap.ast.types._
+import org.slf4j.LoggerFactory
+
 import scala.collection._
 
 class NodeStoreHandler extends NodeStore.Handler[Stack] {
+
+  private val log = LoggerFactory.getLogger(getClass)
+
   type TrackerKey          = String //(NodeID, SlotIndex)
   type HistoricalStatement = (Statement[Message], Long)
 
@@ -29,7 +34,9 @@ class NodeStoreHandler extends NodeStore.Handler[Stack] {
     }
 
     val qs: QuorumSet = setting.presetQuorumSets(setting.localNodeID)
-    setting.connect.broadcastQuorumSet(setting.localNodeID, qs)
+    log.info("broadcasting quorum set")
+    setting.connect.synchronizeQuorumSet(setting.localNodeID, qs)
+
   }
 
   override def getNominateTracker(nodeID: NodeID, slotIndex: SlotIndex): Stack[NominateTracker] =

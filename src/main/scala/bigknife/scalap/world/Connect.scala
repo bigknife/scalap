@@ -41,7 +41,7 @@ trait Connect {
     * @param nodeID node
     * @param quorumSet quorum set
     */
-  def broadcastQuorumSet(nodeID: NodeID, quorumSet: QuorumSet): Unit
+  def synchronizeQuorumSet(nodeID: NodeID, quorumSet: QuorumSet): Unit
 
   /**
     * verify signature of an envelope
@@ -107,7 +107,7 @@ object Connect {
       * @param nodeID    node
       * @param quorumSet quorum set
       */
-    override def broadcastQuorumSet(nodeID: NodeID, quorumSet: QuorumSet): Unit = ()
+    override def synchronizeQuorumSet(nodeID: NodeID, quorumSet: QuorumSet): Unit = ()
 
     /**
       * try to extract a valid value from a not full validated value
