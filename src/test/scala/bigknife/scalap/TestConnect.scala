@@ -5,6 +5,15 @@ import bigknife.scalap.world.Connect
 
 class TestConnect extends Connect {
 
+
+  /**
+    * broad node quorum set
+    *
+    * @param nodeID    node
+    * @param quorumSet quorum set
+    */
+  override def synchronizeQuorumSet(nodeID: NodeID, quorumSet: QuorumSet): Unit = ???
+
   /**
     * timeout for next round
     *

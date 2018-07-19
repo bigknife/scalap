@@ -5,6 +5,7 @@ import bigknife.scalap.ast.usecase.ballot.{BallotBaseHelper, Bumping, BumpingHel
 import bigknife.scalap.ast.usecase.component.Model
 import bigknife.scalap.ast.usecase.nominate.{NominateHelper, EnvelopeProcessHelper => NEPH}
 import bigknife.sop._
+import bigknife.sop.implicits._
 
 
 trait SCP[F[_]] extends NominationProtocol[F] with BallotProtocol[F] with MiscProtocol[F] {

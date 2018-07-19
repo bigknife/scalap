@@ -6,6 +6,9 @@ import bigknife.sop.implicits._
 import bigknife.sop.macros._
 
 @sp trait NodeStore[F[_]] {
+
+  def init(): P[F, Unit]
+
   def getNominateTracker(nodeID: NodeID, slotIndex: SlotIndex): P[F, NominateTracker]
   def getBallotTracker(nodeID: NodeID, slotIndex: SlotIndex): P[F, BallotTracker]
 
